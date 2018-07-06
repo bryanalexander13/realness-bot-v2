@@ -5,9 +5,6 @@ import pandas
 import os
 
 
-#request_params = {'token': '7qcn6czO31you5eWWJlZqVFW42Hp1YobbYoP3E3C'}
-#response_messages = requests.get('https://api.groupme.com/v3/groups/41812904/messages', params = request_params).json()['response']['messages']
-#response_messages
 class User:
     """Users information"""
     def __init__(self, user_id, name):
@@ -234,7 +231,6 @@ def read_messages(request_params, group_id):
     update_users(userdict)
     return message_list
 
-#read_messages(request_params, group_id)[0].content
 
 #checks for last message and runs commands
 def commands(message_list, udict):
@@ -302,74 +298,3 @@ if __name__ == "__main__":
     for k, v in userdict.items():
         print('{} : {}'.format(v['name'],v['realness']))
     run()
-
-
-# def get_realness(udict_list):
-#     for x in udict_list:
-#         x[]
-# for k, v in sorted(list(userdict.items()), key = userdict[k]['realness']):
-#     print(userdict[k]['name'] + userdict[k]['realness'])
-#
-# adict = {'a':5,'b':3,'c':4}
-# list(adict.items())
-# def takeSecond(elem):
-#     return elem[1]
-#
-# realness_list=[]
-# for id in userdict:
-#     realness_list.append((userdict[id]['realness'],userdict[id]['name']))
-# for k in sorted(realness_list,k[1]):
-#     print(k+':'+str(k[1]))
-# realness_list
-#
-# sortedlist=sorted(realness_list, reverse=True)
-# stra=str()
-# for k, v in sortedlist:
-#     stra += v+' : '+str(k)
-# stra
-#
-#
-# userdict
-#
-# userdict['22776072']['realness']=5
-#
-# for k, v in list(userdict.items()):
-#     print(v['name']+str(v['realness']))
-# message_list=[]
-# response_messages
-# message_list[0].attachments[0]
-# len(message_list[1].attachments)
-# if 'type' in message_list[1].attachments[0].keys():
-#     print('true')
-# message_list[5].attachments['type']
-#
-#
-# texta = '@rb very real BRYAN'
-# textb = texta.split('@rb ')[1]
-# modtextlist = textb.lower().split()
-# modtextlist
-# modtextlist.remove('very')
-# modtextlist
-# for message in response_messages:
-#     message_list.append(Message(message['attachments'],
-#                                     message['avatar_url'],
-#                                     message['created_at'],
-#                                     message['favorited_by'],
-#                                     message['group_id'],
-#                                     message['id'],
-#                                     message['name'],
-#                                     message['sender_id'],
-#                                     message['sender_type'],
-#                                     message['source_guid'],
-#                                     message['system'],
-#                                     message['text'],
-#                                     message['user_id']))
-#     if message['user_id'] not in list(userdict.keys()):
-#         userdict[message['user_id']] = {'name':'','nickname': message['name'],'realness' : 0}
-#     if userdict[message['user_id']]['nickname'] != message['name']:
-#         userdict[message['user_id']]['nickname'] = message['name']
-#
-#
-#
-#
-#
