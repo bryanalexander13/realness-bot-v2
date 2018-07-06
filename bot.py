@@ -232,10 +232,10 @@ def read_messages(request_params, group_id):
     return message_list
 
 #Just slap this shit in here
-def timer(rest, user_id):
+def timer(rest, user_id, message):
     global i
     global timer
-    timer = (True, i + (60 * int(rest[2])), user_id)
+    timer = (True, i + (60 * int(rest[2])), user_id, message)
 
 
 #checks for last message and runs commands
@@ -279,7 +279,7 @@ def commands(message_list, udict):
                 rest = text.split(" ")[1:]
                 if (len(rest) == 2 and rest[1].isdigit()):
                     if (message['attachments'][0]['type'] == 'mentions'):
-                        timer(rest, message['attachments'][0]['user_ids'][0])
+                        timer(rest, message['attachments'][0]['user_ids'][0], message)
                         #timer set
                         post_params['text'] = 'Timer set for ' + rest[1] + 'minutes'
                         send_message(post_params)
@@ -303,10 +303,10 @@ def run():
         commands(message_list, userdict)
         #i += 1
         if (timer[0] and timer[1] < i):
-#            post_params['text'] = "Hey Retard. You're Late."
-#            send_message(post_params)
-            subtract_realness([time[2] for i in range(50)], udict, "Hey Retard. You're Late.")
-            timer = (False, 0, "")
+            post_params['text'] = "Hey Retard. You're Late."
+            send_message(post_params)
+            subtract_realness([time[2] for i in range(50)], userdict, timer[3])
+            timer = (False, 0, "", "")
         
         i += 1
         time.sleep(1)
@@ -318,7 +318,7 @@ if __name__ == "__main__":
     request_params = {'token':auth[0]}
     post_params = {'text':'','bot_id':auth[2],'attachments':[]}
     i = 0
-    timer = (False, 0, "")
+    timer = (False, 0, "", "")
 
     print('The current realness levels are: ')
     for k, v in userdict.items():
