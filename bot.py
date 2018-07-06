@@ -325,9 +325,11 @@ def run():
         if (timer[0][0] and timer[0][1] < i):
             post_params['text'] = "Hey Retard. You're Late."
             send_message(post_params)
-            text_change_realness([timer[0][2] for i in range(50)], userdict, timer[0][3], 'subtract')
+            for not_real in [timer[0][2] for i in range(49)]:
+                adjust_realness(not_real,userdict,timer[0][3],'subtract')
+            text_change_realness([timer[0][2]], userdict, timer[0][3], 'subtract')
             del timer[0]
-
+#timer 0 = true timer 1= i  timer 2= id timer 3= message
         i += 1
         time.sleep(1)
 
