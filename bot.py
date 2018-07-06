@@ -128,6 +128,7 @@ def add_realness(names, udict, message):
             if id == 'no id':
                 post_params['text'] = 'Invalid Name'
                 send_message(post_params)
+                return
             elif id == message.sender_id:
                 post_params['text'] = 'You can\'t do that.'
                 send_message(post_params)
@@ -163,6 +164,7 @@ def subtract_realness(names, udict, message):
             if id == 'no id':
                 post_params['text'] = 'Invalid Name'
                 send_message(post_params)
+                return
             elif id == message.sender_id:
                 post_params['text'] = 'You can\'t do that.'
                 send_message(post_params)
@@ -280,7 +282,7 @@ def commands(message_list, udict):
                     modtextlist.remove('not')
                     modtextlist.remove('real')
                     subtract_realness(modtextlist, udict, message)
-            elif text == 'rankings':
+            elif text == 'rankings' or 'ranking':
                 realness(udict)
             elif text.lower().startswith('timer'):
                 if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
