@@ -1,8 +1,8 @@
 import requests
 import time
 import json
-import pandas
 import os
+import sys
 
 
 class User:
@@ -235,7 +235,8 @@ def read_messages(request_params, group_id):
 def start_timer(rest, user_id, message):
     global i
     global timer
-    timer = (True, i + (60 * int(rest[0])), user_id, message)
+    timer += [(True, i + (60 * int(rest[0])), user_id, message)]
+    timer = sorted(timer, key = lambda x:x[1])
 
 
 #checks for last message and runs commands
@@ -249,9 +250,15 @@ def commands(message_list, udict):
         elif message.sender_type == 'bot':
             continue
         elif message.text.lower().startswith('@rb'):
-            last_write(message.id)
             text = message.text.split('@rb ')[1]
-            if text.lower().startswith('very real'):
+            if (len(text) == 1):
+                post_params['text'] = ("These are the following commands:\n" +
+                                      "not real [@mention]\n" + 
+                                      "very real [@mention]\n" +
+                                      "timer [@mention] [time]\n" +
+                                      "ranking")
+                send_message(post_params)
+            elif text.lower().startswith('very real'):
                 if len(text.split('very real')[1]) == 0:
                     post_params['text'] = 'Nothing to add realness to.'
                     send_message(post_params)
@@ -289,24 +296,55 @@ def commands(message_list, udict):
                 else:
                     post_params['text'] = "I don't know who that is"
                     send_message(post_params)
-
-
+            elif (text.lower().startswith("help")):
+                reason = text.lower().split(" ")[1:]
+                if (len(reason) == 2):
+                    if (reason[0] == "not"):
+                        post_params['text'] = ("The not real command is used to shame a user for their lack of realness\n" +
+                                  "Example: @db not real Carter")
+                        send_message(post_params)
+                    elif (reason[0] == "very"):
+                        post_params['text'] = ("The very real command is used to reward a user for their excess of realness\n" +
+                                  "Example: @db very real Carter")
+                        send_message(post_params)
+                    elif (reason[0] == "ranking"):
+                        post_params['text'] = ("The ranking command shows how real everyone is\n" +
+                                  "Example: @db ranking")
+                        send_message(post_params)
+                    elif (reason[0] == "timer"):
+                        post_params['text'] = ("Set a timer in minutes so people aren't late\n" +
+                                  "Example: @db timer @LusciousBuck 10")
+                        send_message(post_params)
+                else:
+                    post_params['text'] = ("These are the following commands:\n" +
+                                      "not real [@mention]\n" + 
+                                      "very real [@mention]\n" +
+                                      "timer [@mention] [time]\n" +
+                                      "ranking")
+                    send_message(post_params)
+            else:
+                    post_params['text'] = ("These are the following commands:\n" +
+                                      "not real [@mention]\n" + 
+                                      "very real [@mention]\n" +
+                                      "timer [@mention] [time]\n" +
+                                      "ranking")
+                    send_message(post_params)
 def run():
     global request_params
     global group_id
     global userdict
     global i
-    global timer
+    global timerv
     #i = 0
     while (i < 2000000):
         message_list = read_messages(request_params, group_id)
         commands(message_list, userdict)
         last_write(message_list[0].id)
-        if (timer[0] and timer[1] < i):
+        if (timer[0][0] and timer[0][1] < i):
             post_params['text'] = "Hey Retard. You're Late."
             send_message(post_params)
-            subtract_realness([timer[2] for i in range(50)], userdict, timer[3])
-            timer = (False, 0, "", "")
+            subtract_realness([timer[0][2] for i in range(50)], userdict, timer[0][3])
+            del timer[0]
 
         i += 1
         time.sleep(1)
@@ -318,7 +356,7 @@ if __name__ == "__main__":
     request_params = {'token':auth[0]}
     post_params = {'text':'','bot_id':auth[2],'attachments':[]}
     i = 0
-    timer = (False, 0, "", "")
+    timer = [(False, sys.maxsize, "", "")]
 
     print('The current realness levels are: ')
     for k, v in userdict.items():
