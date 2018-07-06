@@ -206,7 +206,7 @@ def realness(udict):
 def read_messages(request_params, group_id):
     response_messages = requests.get('https://api.groupme.com/v3/groups/{}/messages'.format(group_id), params = request_params).json()['response']['messages']
     message_list=[]
-    for message in response_messages[::-1]:
+    for message in response_messages:
         message_list.append(Message(message['attachments'],
                                         message['avatar_url'],
                                         message['created_at'],
@@ -230,6 +230,12 @@ def read_messages(request_params, group_id):
             userdict[message['user_id']]['nickname'] = message['name']
     update_users(userdict)
     return message_list
+
+#Just slap this shit in here
+def timer(rest, user_id):
+    global i
+    global timer
+    timer = (True, i + (60 * int(rest[2])), user_id)
 
 
 #checks for last message and runs commands
@@ -269,23 +275,40 @@ def commands(message_list, udict):
                     subtract_realness(modtextlist, udict, message)
             elif text == 'rankings':
                 realness(udict)
-            elif text.lower().startswith('update'):
-                if len(text.split('update')) == 1:
-                    post_params['text'] = 'Nothing to update.'
+            elif text.lower().startswith('timer'):
+                rest = text.split(" ")[1:]
+                if (len(rest) == 2 and rest[1].isdigit()):
+                    if (message['attachments'][0]['type'] == 'mentions'):
+                        timer(rest, message['attachments'][0]['user_ids'][0])
+                        #timer set
+                        post_params['text'] = 'Timer set for ' + rest[1] + 'minutes'
+                        send_message(post_params)
+                    else:
+                        post_params['text'] = "I don't know who that is"
+                        send_message(post_params)
+                else: 
+                    post_params['text'] = "I don't know when that is"
                     send_message(post_params)
-                #else:
-                    #update(message.sender_id,text.split('update')[1],udict)
-
+                    
 def run():
     global request_params
     global group_id
     global userdict
+    global i
+    global timer
     #i = 0
-    while (2+2 == 4):
+    while (i < 2000000):
         message_list = read_messages(request_params, group_id)
         last_write(message_list[0]['user_id'])
         commands(message_list, userdict)
         #i += 1
+        if (timer[0] and timer[1] < i):
+#            post_params['text'] = "Hey Retard. You're Late."
+#            send_message(post_params)
+            subtract_realness([time[2] for i in range(50)], udict, "Hey Retard. You're Late.")
+            timer = (False, 0, "")
+        
+        i += 1
         time.sleep(1)
 
 if __name__ == "__main__":
@@ -294,6 +317,8 @@ if __name__ == "__main__":
     group_id = auth[1]
     request_params = {'token':auth[0]}
     post_params = {'text':'','bot_id':auth[2],'attachments':[]}
+    i = 0
+    timer = (False, 0, "")
 
     print('The current realness levels are: ')
     for k, v in userdict.items():
