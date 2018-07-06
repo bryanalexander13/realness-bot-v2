@@ -235,7 +235,7 @@ def read_messages(request_params, group_id):
 def start_timer(rest, user_id, message):
     global i
     global timer
-    timer = (True, i + (60 * int(rest[2])), user_id, message)
+    timer = (True, i + (60 * int(rest[0])), user_id, message)
 
 
 #checks for last message and runs commands
