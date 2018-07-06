@@ -278,19 +278,19 @@ def commands(message_list, udict):
             elif text.lower().startswith('timer'):
                 if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
                     name = message.attachments[0]['loci'][0]
-                    rest = text[name[0] + name[1] -1:].strip().split(" ")
+                    rest = text[name[0] + name[1]-3:].strip().split(" ")
                     if (len(rest) == 1 and rest[0].isdigit()):
                         start_timer(rest, message.attachments[0]['user_ids'][0], message)
                         post_params['text'] = 'Timer set for ' + rest[0] + 'minutes'
                         send_message(post_params)
-                    else: 
+                    else:
                         post_params['text'] = "I don't know when that is" + str(text[name[0] + name[1]-1:])
                         send_message(post_params)
                 else:
                     post_params['text'] = "I don't know who that is"
                     send_message(post_params)
 
-                    
+
 def run():
     global request_params
     global group_id
@@ -305,9 +305,9 @@ def run():
         if (timer[0] and timer[1] < i):
             post_params['text'] = "Hey Retard. You're Late."
             send_message(post_params)
-            subtract_realness([time[2] for i in range(50)], userdict, timer[3])
+            subtract_realness([timer[2] for i in range(50)], userdict, timer[3])
             timer = (False, 0, "", "")
-        
+
         i += 1
         time.sleep(1)
 
