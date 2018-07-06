@@ -284,7 +284,7 @@ def commands(message_list, udict):
                         post_params['text'] = 'Timer set for ' + rest[1] + 'minutes'
                         send_message(post_params)
                     else: 
-                        post_params['text'] = "I don't know when that is" + str(rest)
+                        post_params['text'] = "I don't know when that is" + str(text)
                         send_message(post_params)
                 else:
                     post_params['text'] = "I don't know who that is"
