@@ -278,7 +278,7 @@ def commands(message_list, udict):
             elif text.lower().startswith('timer'):
                 if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
                     name = message.attachments[0]['loci'][0]
-                    rest = text[name[0] + name[1]:].strip().split(" ")
+                    rest = text[name[0] + name[1]-1:].strip().split(" ")
                     if (len(rest) == 1 and rest[0].isdigit()):
                         timer(rest, message.attachments[0]['user_ids'][0], message)
                         post_params['text'] = 'Timer set for ' + rest[1] + 'minutes'
