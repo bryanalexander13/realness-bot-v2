@@ -281,7 +281,7 @@ def commands(message_list, udict):
                     rest = text[name[0] + name[1] -2:].strip().split(" ")
                     if (len(rest) == 1 and rest[0].isdigit()):
                         start_timer(rest, message.attachments[0]['user_ids'][0], message)
-                        post_params['text'] = 'Timer set for ' + rest[1] + 'minutes'
+                        post_params['text'] = 'Timer set for ' + rest[0] + 'minutes'
                         send_message(post_params)
                     else: 
                         post_params['text'] = "I don't know when that is" + str(text[name[0] + name[1]-1:])
