@@ -276,19 +276,20 @@ def commands(message_list, udict):
             elif text == 'rankings':
                 realness(udict)
             elif text.lower().startswith('timer'):
-                rest = text.split(" ")[1:]
-                if (len(rest) == 2 and rest[1].isdigit()):
-                    if (message.attachments[0]['type'] == 'mentions'):
+                if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
+                    name = message.attachments[0]['loci'][0]
+                    rest = text[:name[0] + name[1]].strip().split(" ")
+                    if (len(rest) == 1 and rest[0].isdigit()):
                         timer(rest, message.attachments[0]['user_ids'][0], message)
-                        #timer set
                         post_params['text'] = 'Timer set for ' + rest[1] + 'minutes'
                         send_message(post_params)
-                    else:
-                        post_params['text'] = "I don't know who that is"
+                    else: 
+                        post_params['text'] = "I don't know when that is"
                         send_message(post_params)
-                else: 
-                    post_params['text'] = "I don't know when that is"
+                else:
+                    post_params['text'] = "I don't know who that is"
                     send_message(post_params)
+
                     
 def run():
     global request_params
