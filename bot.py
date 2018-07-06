@@ -278,8 +278,8 @@ def commands(message_list, udict):
             elif text.lower().startswith('timer'):
                 rest = text.split(" ")[1:]
                 if (len(rest) == 2 and rest[1].isdigit()):
-                    if (message['attachments'][0]['type'] == 'mentions'):
-                        timer(rest, message['attachments'][0]['user_ids'][0], message)
+                    if (message.attachments[0]['type'] == 'mentions'):
+                        timer(rest, message.attachments[0]['user_ids'][0], message)
                         #timer set
                         post_params['text'] = 'Timer set for ' + rest[1] + 'minutes'
                         send_message(post_params)
@@ -300,7 +300,7 @@ def run():
     while (i < 2000000):
         message_list = read_messages(request_params, group_id)
         commands(message_list, userdict)
-        last_write(message_list[0]['id'])
+        last_write(message_list[0].id)
         if (timer[0] and timer[1] < i):
             post_params['text'] = "Hey Retard. You're Late."
             send_message(post_params)
