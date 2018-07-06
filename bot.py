@@ -201,12 +201,16 @@ def read_messages(request_params, group_id):
                                         message['user_id']))
         if message['sender_type'] == 'bot':
             continue
-        elif message['sender_type'] == 'system':
+        if message['sender_type'] == 'system':
             continue
-        elif message['user_id'] not in list(userdict.keys()):
+        if message['user_id'] not in list(userdict.keys()):
             userdict[message['user_id']] = {'name':'','nickname': message['name'],'realness' : 0}
-        elif userdict[message['user_id']]['nickname'] != message['name']:
+        if userdict[message['user_id']]['nickname'] != message['name']:
             userdict[message['user_id']]['nickname'] = message['name']
+        if (message['attachments'] != [] and message['attachments'][0]['type'] =='mentions' ):
+            for i,id in enumerate(message['attachments'][0]['user_ids']):
+                if userdict[id]['nickname'] != message['text'][message['attachments'][0]['loci'][i][0]+1:message['attachments'][0]['loci'][i][0]+message['attachments'][0]['loci'][i][1]]:
+                    userdict[id]['nickname'] = message['text'][message['attachments'][0]['loci'][i][0]+1:message['attachments'][0]['loci'][i][0]+message['attachments'][0]['loci'][i][1]]
     update_users(userdict)
     return message_list
 
