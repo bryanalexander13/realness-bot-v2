@@ -206,7 +206,10 @@ def realness(udict):
 
 #reads messages and creates message_list of Message objects
 def read_messages(request_params, group_id):
-    response_messages = requests.get('https://api.groupme.com/v3/groups/{}/messages'.format(group_id), params = request_params).json()['response']['messages']
+    try:
+        response_messages = requests.get('https://api.groupme.com/v3/groups/{}/messages'.format(group_id), params = request_params).json()['response']['messages']
+    except:
+        response_messages = requests.get('https://api.groupme.com/v3/groups/{}/messages'.format(group_id), params = request_params).json()['response']['messages']
     message_list=[]
     for message in response_messages:
         message_list.append(Message(message['attachments'],
