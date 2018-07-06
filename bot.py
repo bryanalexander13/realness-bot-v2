@@ -206,7 +206,7 @@ def realness(udict):
 def read_messages(request_params, group_id):
     response_messages = requests.get('https://api.groupme.com/v3/groups/{}/messages'.format(group_id), params = request_params).json()['response']['messages']
     message_list=[]
-    for message in response_messages[::-1]:
+    for message in response_messages:
         message_list.append(Message(message['attachments'],
                                         message['avatar_url'],
                                         message['created_at'],
@@ -237,11 +237,12 @@ def commands(message_list, udict):
     global post_params
     for message in message_list:
         if int(message.id) <= int(last_load()):
-            continue
+            break
         elif message.text == None:
             continue
         elif message.sender_type == 'bot':
             last_write(message.id)
+            continue
         elif message.text.lower().startswith('@rb'):
             last_write(message.id)
             text = message.text.split('@rb ')[1]
