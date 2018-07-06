@@ -299,9 +299,8 @@ def run():
     #i = 0
     while (i < 2000000):
         message_list = read_messages(request_params, group_id)
-        last_write(message_list[0]['user_id'])
         commands(message_list, userdict)
-        #i += 1
+        last_write(message_list[0]['id'])
         if (timer[0] and timer[1] < i):
             post_params['text'] = "Hey Retard. You're Late."
             send_message(post_params)
