@@ -237,11 +237,11 @@ def commands(message_list, udict):
     global post_params
     for message in message_list:
         if int(message.id) <= int(last_load()):
-            continue
+            break
         elif message.text == None:
             continue
         elif message.sender_type == 'bot':
-            last_write(message.id)
+            continue
         elif message.text.lower().startswith('@rb'):
             last_write(message.id)
             text = message.text.split('@rb ')[1]
@@ -283,6 +283,7 @@ def run():
     #i = 0
     while (2+2 == 4):
         message_list = read_messages(request_params, group_id)
+        last_write(message_list[0]['user_id'])
         commands(message_list, userdict)
         #i += 1
         time.sleep(1)
