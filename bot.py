@@ -3,6 +3,7 @@ import time
 import json
 import os
 import sys
+from datetime import datetime, timedelta
 
 
 class User:
@@ -216,12 +217,39 @@ def read_messages(request_params, group_id):
 
 #Just slap this shit in here
 def start_timer(rest, user_id, message):
-    global i
     global timer
-    timer += [(True, i + (60 * int(rest[0])), user_id, message)]
+    timer += [(True, datetime.now() + (timedelta(minutes=int(rest[0]))), user_id, message)]
     timer = sorted(timer, key = lambda x:x[1])
 
 
+def set_timer(text, message):
+    if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
+        name = message.attachments[0]['loci'][0]
+        rest = text[name[0] + name[1]-3:].strip().split(" ")
+        if (len(rest) == 1 and rest[0].isdigit()):
+            start_timer(rest, message.attachments[0]['user_ids'][0], message)
+            post_params['text'] = 'Timer set for ' + rest[0] + ' minutes'
+            send_message(post_params)
+        else:
+            post_params['text'] = "I don't know when that is" + str(text[name[0] + name[1]-1:])
+            send_message(post_params)
+    else:
+        post_params['text'] = "I don't know who that is"
+        send_message(post_params)
+        
+
+def cancel_timer(user_id):
+    global timer
+    t = False
+    for k, u_id in enumerate([j[2] for j in timer]):
+        if user_id == u_id:
+            del timer[k]
+            t = True
+    if t:
+        post_params['text'] = "Finally"
+        send_message(post_params)
+    
+    
 def helper_main(post_params):
     post_params['text'] = ("These are the following commands:\n" +
                                       "not real [@mention]\n" +
@@ -229,6 +257,7 @@ def helper_main(post_params):
                                       "timer [@mention] [time]\n" +
                                       "ranking")
     send_message(post_params)
+
 
 def helper_specific(post_params, text):
     reason = text.lower().split(" ")[1:]
@@ -277,21 +306,6 @@ def not_real(text, message, udict, nameslist):
     text_change_realness(nameslist, udict, message, 'subtract')
     
     
-def set_timer(text, message):
-    if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
-        name = message.attachments[0]['loci'][0]
-        rest = text[name[0] + name[1]-3:].strip().split(" ")
-        if (len(rest) == 1 and rest[0].isdigit()):
-            start_timer(rest, message.attachments[0]['user_ids'][0], message)
-            post_params['text'] = 'Timer set for ' + rest[0] + ' minutes'
-            send_message(post_params)
-        else:
-            post_params['text'] = "I don't know when that is" + str(text[name[0] + name[1]-1:])
-            send_message(post_params)
-    else:
-        post_params['text'] = "I don't know who that is"
-        send_message(post_params)
-        
 #checks for last message and runs commands
 def commands(message_list, udict):
     global post_params
@@ -302,6 +316,9 @@ def commands(message_list, udict):
             continue
         elif message.sender_type == 'bot':
             continue
+        elif message.text.lower().startswith('here'):
+            cancel_timer(message.user_id)
+            
         elif message.text.lower().startswith('@rb'):
             text = message.text.split('@rb ')[1]
             nameslist=[]
@@ -324,6 +341,9 @@ def commands(message_list, udict):
             elif (text.lower().startswith("help")):
                 helper_specific(post_params, text)
                 
+            elif (text.lower().startswith('here')):
+                cancel_timer(message.user_id)
+                
             else:
                 helper_main(post_params)
                 
@@ -331,22 +351,22 @@ def run():
     global request_params
     global group_id
     global userdict
-    global i
-    global timerv
-    #i = 0
-    while (i < 2000000):
+    global timer
+    
+    while (1 == True):
         message_list = read_messages(request_params, group_id)
         commands(message_list, userdict)
         last_write(message_list[0].id)
-        if (timer[0][0] and timer[0][1] < i):
+        
+        if (len(timer) > 0 and timer[0][0] and timer[0][1] < datetime.now()):
             post_params['text'] = "Hey Retard. You're Late."
             send_message(post_params)
+            
             for not_real in [timer[0][2] for i in range(49)]:
                 adjust_realness(not_real,userdict,timer[0][3],'subtract')
             text_change_realness([timer[0][2]], userdict, timer[0][3], 'subtract')
             del timer[0]
-#timer 0 = true timer 1= i  timer 2= id timer 3= message
-        i += 1
+
         time.sleep(1)
 
 if __name__ == "__main__":
@@ -355,8 +375,7 @@ if __name__ == "__main__":
     group_id = auth[1]
     request_params = {'token':auth[0]}
     post_params = {'text':'','bot_id':auth[2],'attachments':[]}
-    i = 0
-    timer = [(False, sys.maxsize, "", "")]
+    timer = []
 
     print('The current realness levels are: ')
     for k, v in userdict.items():
