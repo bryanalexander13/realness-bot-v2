@@ -222,6 +222,76 @@ def start_timer(rest, user_id, message):
     timer = sorted(timer, key = lambda x:x[1])
 
 
+def helper_main(post_params):
+    post_params['text'] = ("These are the following commands:\n" +
+                                      "not real [@mention]\n" +
+                                      "very real [@mention]\n" +
+                                      "timer [@mention] [time]\n" +
+                                      "ranking")
+    send_message(post_params)
+
+def helper_specific(post_params, text):
+    reason = text.lower().split(" ")[1:]
+    if (len(reason) == 2):
+        if (reason[0] == "not"):
+            post_params['text'] = ("The not real command is used to shame a user for their lack of realness\n" +
+                      "Example: @db not real Carter")
+            send_message(post_params)
+        elif (reason[0] == "very"):
+            post_params['text'] = ("The very real command is used to reward a user for their excess of realness\n" +
+                      "Example: @db very real Carter")
+            send_message(post_params)
+        elif (reason[0] == "ranking"):
+            post_params['text'] = ("The ranking command shows how real everyone is\n" +
+                      "Example: @db ranking")
+            send_message(post_params)
+        elif (reason[0] == "timer"):
+            post_params['text'] = ("Set a timer in minutes so people aren't late\n" +
+                      "Example: @db timer @LusciousBuck 10")
+            send_message(post_params)
+    else:
+        helper_main(post_params)
+        
+
+def very_real(text, message, udict, nameslist):
+    if len(text.split('very real')[1]) == 0:
+        post_params['text'] = 'Nothing to add realness to.'
+        send_message(post_params)
+    if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
+        nameslist = message.attachments[0]['user_ids']
+        nameslist += remove_mention_text(message,udict).split()[2:]
+    else:
+        nameslist += text.lower().split()[2:]
+    text_change_realness(nameslist, udict, message, 'add')
+    
+    
+def not_real(text, message, udict, nameslist):
+    if len(text.split('not real')[1]) == 0:
+        post_params['text'] = 'Nothing to add realness to.'
+        send_message(post_params)
+    if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
+        nameslist = message.attachments[0]['user_ids']
+        nameslist += remove_mention_text(message,udict).split()[2:]
+    else:
+        nameslist += text.lower().split()[2:]
+    text_change_realness(nameslist, udict, message, 'subtract')
+    
+    
+def set_timer(text, message):
+    if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
+        name = message.attachments[0]['loci'][0]
+        rest = text[name[0] + name[1]-3:].strip().split(" ")
+        if (len(rest) == 1 and rest[0].isdigit()):
+            start_timer(rest, message.attachments[0]['user_ids'][0], message)
+            post_params['text'] = 'Timer set for ' + rest[0] + ' minutes'
+            send_message(post_params)
+        else:
+            post_params['text'] = "I don't know when that is" + str(text[name[0] + name[1]-1:])
+            send_message(post_params)
+    else:
+        post_params['text'] = "I don't know who that is"
+        send_message(post_params)
+        
 #checks for last message and runs commands
 def commands(message_list, udict):
     global post_params
@@ -235,82 +305,28 @@ def commands(message_list, udict):
         elif message.text.lower().startswith('@rb'):
             text = message.text.split('@rb ')[1]
             nameslist=[]
+            
             if (len(text) == 1):
-                post_params['text'] = ("These are the following commands:\n" +
-                                      "not real [@mention]\n" +
-                                      "very real [@mention]\n" +
-                                      "timer [@mention] [time]\n" +
-                                      "ranking")
-                send_message(post_params)
+                helper_main(post_params)
+                
             elif text.lower().startswith('very real'):
-                if len(text.split('very real')[1]) == 0:
-                    post_params['text'] = 'Nothing to add realness to.'
-                    send_message(post_params)
-                if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
-                    nameslist = message.attachments[0]['user_ids']
-                    nameslist += remove_mention_text(message,udict).split()[2:]
-                else:
-                    nameslist += text.lower().split()[2:]
-                text_change_realness(nameslist, udict, message, 'add')
+                very_real(text, message, udict, nameslist)
+                
             elif text.lower().startswith('not real'):
-                if len(text.split('not real')[1]) == 0:
-                    post_params['text'] = 'Nothing to add realness to.'
-                    send_message(post_params)
-                if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
-                    nameslist = message.attachments[0]['user_ids']
-                    nameslist += remove_mention_text(message,udict).split()[2:]
-                else:
-                    nameslist += text.lower().split()[2:]
-                text_change_realness(nameslist, udict, message, 'subtract')
+                not_real(text, message, udict, nameslist)
+                
             elif text.lower() == 'rankings' or text.lower() == 'ranking':
                 realness(udict)
+                
             elif text.lower().startswith('timer'):
-                if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
-                    name = message.attachments[0]['loci'][0]
-                    rest = text[name[0] + name[1]-3:].strip().split(" ")
-                    if (len(rest) == 1 and rest[0].isdigit()):
-                        start_timer(rest, message.attachments[0]['user_ids'][0], message)
-                        post_params['text'] = 'Timer set for ' + rest[0] + ' minutes'
-                        send_message(post_params)
-                    else:
-                        post_params['text'] = "I don't know when that is" + str(text[name[0] + name[1]-1:])
-                        send_message(post_params)
-                else:
-                    post_params['text'] = "I don't know who that is"
-                    send_message(post_params)
+                set_timer(text, message)
+                    
             elif (text.lower().startswith("help")):
-                reason = text.lower().split(" ")[1:]
-                if (len(reason) == 2):
-                    if (reason[0] == "not"):
-                        post_params['text'] = ("The not real command is used to shame a user for their lack of realness\n" +
-                                  "Example: @db not real Carter")
-                        send_message(post_params)
-                    elif (reason[0] == "very"):
-                        post_params['text'] = ("The very real command is used to reward a user for their excess of realness\n" +
-                                  "Example: @db very real Carter")
-                        send_message(post_params)
-                    elif (reason[0] == "ranking"):
-                        post_params['text'] = ("The ranking command shows how real everyone is\n" +
-                                  "Example: @db ranking")
-                        send_message(post_params)
-                    elif (reason[0] == "timer"):
-                        post_params['text'] = ("Set a timer in minutes so people aren't late\n" +
-                                  "Example: @db timer @LusciousBuck 10")
-                        send_message(post_params)
-                else:
-                    post_params['text'] = ("These are the following commands:\n" +
-                                      "not real [@mention]\n" +
-                                      "very real [@mention]\n" +
-                                      "timer [@mention] [time]\n" +
-                                      "ranking")
-                    send_message(post_params)
+                helper_specific(post_params, text)
+                
             else:
-                    post_params['text'] = ("These are the following commands:\n" +
-                                      "not real [@mention]\n" +
-                                      "very real [@mention]\n" +
-                                      "timer [@mention] [time]\n" +
-                                      "ranking")
-                    send_message(post_params)
+                helper_main(post_params)
+                
 def run():
     global request_params
     global group_id
