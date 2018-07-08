@@ -2,24 +2,88 @@ import requests
 import time
 import json
 import os
-import sys
 from datetime import datetime, timedelta
 
 
 class User:
-    """Users information"""
-    def __init__(self, user_id, name):
+    """Users information"""    
+    def __init__(self, user_id, name, nickname, realness = 0, abilities = []):
         self.user_id = user_id
         self.name = name
-        self.realness = 0
-
+        self.nickname = nickname
+        self.realness = realness
+        self.abilities = abilities
+        
     def add_realness(self):
         self.realness += 1
-
+    
     def subtract_realness(self):
         self.realness -= 1
-
-
+    
+    def add_ability(self, ability):
+        self.abilities += ability
+        
+    def remove_ability(self, ability):
+        self.abilities.remove("ability")
+        
+    def changeNickname(self, nickname):
+        self.nickname = nickname
+        
+        
+class UserList:
+    def __init__(self, udict):
+        self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities']) for i in udict]
+        self.ids = [i['user_id'] for i in udict]
+        self.names = [i['name'] for i in udict]
+        self.nicknames = [i['nickname'] for i in udict]
+        self.realness = [i['user_id'] for i in udict]
+    
+    def find(self, user_id):
+        try:
+            return [i for i in self.ulist if i.user_id == user_id][0]
+        except:
+            return User("0", "invalid", "invalid")
+    
+    def findByName(self, name):
+        try:
+            return [i for i in self.ulist if i.name == name][0]
+        except:
+            return User("0", "invalid", "invalid")
+        
+    def findByNickname(self, nickname):
+        try:
+            return [i for i in self.ulist if i.nickname == nickname][0]
+        except:
+            return User("0", "invalid", "invalid")
+        
+    def add(self, user):
+        self.ulist += user
+        self.ids += user.user_id
+        
+    def remove(self, user_id):
+        user = self.find(user_id)
+        try:
+            self.ids.remove(user_id)
+            self.ulist.remove(user)
+        except:
+            return
+        
+    def ranking(self, post_params):
+        text = 'The current realness levels are: \n'
+        for user in sorted(self.ulist, key=lambda x: x.realness, reverse=True):
+            text += user.nickname +': '+ str(user.realness) + '\n'
+        post_params['text'] = text
+        send_message(post_params)
+    
+    def update(self, message):
+        user = self.find(message.sender_id)
+        if user.nickname == message.name:
+            return False
+        else:
+            user.nickname = message.name
+            return True
+    
+    
 class Message:
     """A message handler"""
 
@@ -62,17 +126,16 @@ def auth_load():
         data = json.loads(file[0])
         return data['token'], data['group_id'], data['bot_id']
 
-#loads user information
-def user_load():
-    with open(os.path.abspath('users.json'),'r') as users:
+
+def users_load():
+    with open(os.path.abspath('users2.json'),'r') as users:
         file = users.readlines()
         data = json.loads(file[0])
         return data
-
-#update userdictionary, realness, nicknames
-def update_users(udict):
-    with open(os.path.abspath('users.json'),'w') as users:
-        users.write(json.dumps(udict))
+    
+def users_write(ulist):
+    with open(os.path.abspath('users2.json'),'w') as users:
+        users.write(json.dumps([i.__dict__ for i in ulist.ulist]))
 
 #loads last message checked
 def last_load():
@@ -92,127 +155,93 @@ def send_message(post_params):
     requests.post("https://api.groupme.com/v3/bots/post", params = post_params)
 
 #removes mention text from message
-def remove_mention_text(message,udict):
+def remove_mention_text(message,ulist):
     message_text = message.text
     for user in message.attachments[0]['user_ids']:
-        mention = '@'+udict[user]['nickname']
+        mention = '@'+ (ulist.find(user).nickname)
         message_text = message_text.replace(mention,'')
     return message_text
 
-#looks up user_id by name
-def id_lookup(name,udict):
-    namelist = []
-    for id, information in udict.items():
-        namelist.append(information['name'])
-    if name not in namelist:
-        return 'no id'
-    for id, information in udict.items():
-        if information['name'] == name.lower():
-            return id
-
-def nickname_instead_of_name(udict_id_key):
-    if len(udict_id_key['name']) == 0:
-        return 'nickname'
-    else:
-        return 'name'
 #changes realness in dictionary, updates
-def adjust_realness(id, udict, message, type):
+def adjust_realness(newid, ulist, message, reason):
     global post_params
-    if id == message.sender_id:
+    if newid == message.sender_id:
         post_params['text'] = 'You can\'t change your own realness.'
         send_message(post_params)
         return False
-    elif type == 'add':
-        udict[id]['realness'] += 1
-    elif type == 'subtract':
-        udict[id]['realness'] -= 1
-    update_users(udict)
+    elif reason == 'add':
+        ulist.find(newid).add_realness()
+    elif reason == 'subtract':
+        ulist.find(newid).subtract_realness()
+    users_write(ulist)
     return True
-
+ 
 #filters through ids and text names to adjust user dictionary, updates new dictionary
-def text_change_realness(names, udict, message, type):
+def text_change_realness(names, ulist, message, reason):
     global post_params
     add_list = []
     for name in names:
-        if (name.isdigit() and len(name)==8 and name in list(udict.keys())):
+        if (name.isdigit() and len(name)==8 and name in list(ulist.ids)):
             add_list.append(name)
         else:
-            add_list.append(id_lookup(name, udict))
+            add_list.append(ulist.findByName(name).user_id)
     if len(add_list) == 0:
         return
-    if add_list.count('no id') > 1:
+    if add_list.count('0') > 1:
         post_params['text'] = 'Invalid IDs'
         send_message(post_params)
         return
-    if type == 'add':
+    if reason == 'add':
         text = 'Real '
-    elif type == 'subtract':
-        text = 'Not Real '
-    for id in [id for id in list(set(add_list)) if (id != 'no id')]:
-        if adjust_realness(id, udict, message, type) == True:
-            text += udict[id]['name'].capitalize() + '. '
+    elif reason == 'subtract':
+        text = 'Not Real '        
+    for newid in add_list:
+        if adjust_realness(newid, ulist, message, reason):
+            text += ulist.find(newid).name.capitalize() + '. '
     #post final message
     post_params['text'] = text
     send_message(post_params)
     #terminal carter handling
-    if (type == 'subtract' and id_lookup('carter',udict) in add_list):
+    if (reason == 'subtract' and ulist.findByName("carter").user_id in add_list):
         post_params['text'] = 'It is terminal.'
         send_message(post_params)
 
-
-def realness(udict):
-    global post_params
-    header = 'The current realness levels are:'
-    levels=str()
-    realness_list = []
-    for id in userdict:
-        realness_list.append((udict[id]['realness'],udict[id][nickname_instead_of_name(udict[id])]))
-    realness_list = sorted(realness_list,reverse=True)
-    for k, v in realness_list:
-        levels += '\n' + v.capitalize() +' : '+ str(k)
-    txt = header + levels
-    post_params['text'] = txt
-    send_message(post_params)
-
-#update userdict name
-# def update(sender_id, name, udict):
-#     global post_params
-#     udict[sender_id]['name'] = name.lower()
-#     update_users(udict)
-#     post_params['text'] = 'Updated.'
-#     send_message(post_params)
-
 #reads messages and creates message_list of Message objects
-def read_messages(request_params, group_id):
+def read_messages(request_params, group_id, ulist):
     response_messages = requests.get('https://api.groupme.com/v3/groups/{}/messages'.format(group_id), params = request_params).json()['response']['messages']
     message_list=[]
+    last = last_load()
+    
+    
     for message in response_messages:
-        message_list.append(Message(message['attachments'],
-                                        message['avatar_url'],
-                                        message['created_at'],
-                                        message['favorited_by'],
-                                        message['group_id'],
-                                        message['id'],
-                                        message['name'],
-                                        message['sender_id'],
-                                        message['sender_type'],
-                                        message['source_guid'],
-                                        message['system'],
-                                        message['text'],
-                                        message['user_id']))
-        if message['sender_type'] == 'bot':
+        if int(message['id']) <= int(last):
+            break
+        mess = Message(message['attachments'],
+                        message['avatar_url'],
+                        message['created_at'],
+                        message['favorited_by'],
+                        message['group_id'],
+                        message['id'],
+                        message['name'],
+                        message['sender_id'],
+                        message['sender_type'],
+                        message['source_guid'],
+                        message['system'],
+                        message['text'],
+                        message['user_id'])
+        message_list.append(mess)
+        
+        if mess.sender_type == 'bot' or mess.sender_type == 'system':
             continue
-        if message['sender_type'] == 'system':
-            continue
-        if message['user_id'] not in list(userdict.keys()):
-            userdict[message['user_id']] = {'name':'','nickname': message['name'],'realness' : 0}
-        if userdict[message['user_id']]['nickname'] != message['name']:
-            userdict[message['user_id']]['nickname'] = message['name']
-        if (message['attachments'] != [] and message['attachments'][0]['type'] =='mentions' ):
-            for i,id in enumerate(message['attachments'][0]['user_ids']):
-                if userdict[id]['nickname'] != message['text'][message['attachments'][0]['loci'][i][0]+1:message['attachments'][0]['loci'][i][0]+message['attachments'][0]['loci'][i][1]]:
-                    userdict[id]['nickname'] = message['text'][message['attachments'][0]['loci'][i][0]+1:message['attachments'][0]['loci'][i][0]+message['attachments'][0]['loci'][i][1]]
-    update_users(userdict)
+        else:
+            commands(mess, userlist)
+            done = ulist.update(mess)
+            if done:
+                users_write(ulist)
+                
+    if len(message_list) > 0:
+        last_write(message_list[0].id)
+        
     return message_list
 
 #Just slap this shit in here
@@ -282,102 +311,103 @@ def helper_specific(post_params, text):
         helper_main(post_params)
         
 
-def very_real(text, message, udict, nameslist):
+def very_real(text, message, ulist, nameslist):
     if len(text.split('very real')[1]) == 0:
         post_params['text'] = 'Nothing to add realness to.'
         send_message(post_params)
     if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
         nameslist = message.attachments[0]['user_ids']
-        nameslist += remove_mention_text(message,udict).split()[2:]
+        nameslist += remove_mention_text(message,ulist).split()[2:]
     else:
         nameslist += text.lower().split()[2:]
-    text_change_realness(nameslist, udict, message, 'add')
+    text_change_realness(nameslist, ulist, message, 'add')
     
     
-def not_real(text, message, udict, nameslist):
+def not_real(text, message, ulist, nameslist):
     if len(text.split('not real')[1]) == 0:
         post_params['text'] = 'Nothing to add realness to.'
         send_message(post_params)
     if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
         nameslist = message.attachments[0]['user_ids']
-        nameslist += remove_mention_text(message,udict).split()[2:]
+        nameslist += remove_mention_text(message,ulist).split()[2:]
     else:
         nameslist += text.lower().split()[2:]
-    text_change_realness(nameslist, udict, message, 'subtract')
+    text_change_realness(nameslist, ulist, message, 'subtract')
     
     
 #checks for last message and runs commands
-def commands(message_list, udict):
+def commands(message, ulist):
     global post_params
-    for message in message_list:
-        if int(message.id) <= int(last_load()):
-            break
-        elif message.text == None:
-            continue
-        elif message.sender_type == 'bot':
-            continue
-        elif message.text.lower().startswith('here'):
-            cancel_timer(message.user_id)
-            
-        elif message.text.lower().startswith('@rb'):
-            text = message.text.split('@rb ')[1]
-            nameslist=[]
-            
-            if (len(text) == 1):
-                helper_main(post_params)
+   
+    if message.text == None:
+        return
+    elif message.text.lower().startswith('here'):
+        cancel_timer(message.user_id)
+    elif (message.text.lower().startswith('@rb')):
+            text = message.text.split('@rb ')
+            if len(text) > 1:    
+                text = text[1]
+                nameslist=[]
                 
-            elif text.lower().startswith('very real'):
-                very_real(text, message, udict, nameslist)
-                
-            elif text.lower().startswith('not real'):
-                not_real(text, message, udict, nameslist)
-                
-            elif text.lower() == 'rankings' or text.lower() == 'ranking':
-                realness(udict)
-                
-            elif text.lower().startswith('timer'):
-                set_timer(text, message)
+                if (len(text) == 1):
+                    helper_main(post_params)
                     
-            elif (text.lower().startswith("help")):
-                helper_specific(post_params, text)
+                elif text.lower().startswith('very real'):
+                    very_real(text, message, ulist, nameslist)
+                    
+                elif text.lower().startswith('not real'):
+                    not_real(text, message, ulist, nameslist)
+                    
+                elif text.lower() == 'rankings' or text.lower() == 'ranking':
+                    ulist.ranking(post_params)
+                    
+                elif text.lower().startswith('timer'):
+                    set_timer(text, message)
+                        
+                elif (text.lower().startswith("help")):
+                    helper_specific(post_params, text)
+                    
+                elif (text.lower().startswith('here')):
+                    cancel_timer(message.user_id)
                 
-            elif (text.lower().startswith('here')):
-                cancel_timer(message.user_id)
-                
+                else:
+                    helper_main(post_params)
+#            elif (text.lower().startswith('shop'))
             else:
                 helper_main(post_params)
+      
                 
 def run():
     global request_params
     global group_id
-    global userdict
+    global userlist
     global timer
     
     while (1 == True):
-        message_list = read_messages(request_params, group_id)
-        commands(message_list, userdict)
-        last_write(message_list[0].id)
+        message_list = read_messages(request_params, group_id, userlist)
         
         if (len(timer) > 0 and timer[0][0] and timer[0][1] < datetime.now()):
             post_params['text'] = "Hey Retard. You're Late."
             send_message(post_params)
             
-            for not_real in [timer[0][2] for i in range(49)]:
-                adjust_realness(not_real,userdict,timer[0][3],'subtract')
-            text_change_realness([timer[0][2]], userdict, timer[0][3], 'subtract')
+            for val in [timer[0][2] for i in range(49)]:
+                adjust_realness(val, userlist, timer[0][3], 'subtract')
+            text_change_realness([timer[0][2]], userlist, timer[0][3], 'subtract')
             del timer[0]
 
         time.sleep(1)
 
 if __name__ == "__main__":
-    userdict = user_load()
+    user_dict = users_load()
+    userlist = UserList(user_dict)
     auth = auth_load()
     group_id = auth[1]
     request_params = {'token':auth[0]}
     post_params = {'text':'','bot_id':auth[2],'attachments':[]}
     timer = []
 
-    print('The current realness levels are: ')
-    for k, v in userdict.items():
-        print('{} : {}'.format(v['name'],v['realness']))
+    text = 'The current realness levels are: \n'
+    for user in sorted(userlist.ulist, key=lambda x: x.realness):
+        text += user.nickname +': ' + str(user.realness) + '\n'
+    print(text)
     run()
