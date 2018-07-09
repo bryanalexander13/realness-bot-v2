@@ -1,11 +1,11 @@
-#Fixes:
+# Fixes:
 #### -
 
-#Improvements:
+# Improvements:
 #### -users and userlist dicts to speed up lookup
 #### -timer class
 
-#Additions:
+# Additions:
 #### -bomb ability
 #### -remind me timer
 #### -protection with retribution
