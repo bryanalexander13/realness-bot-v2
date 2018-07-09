@@ -260,21 +260,24 @@ def text_change_realness(names, ulist, message, reason):
     global post_params
     add_list = []
     for name in names:
-        try:
-            if ulist.find(name).protected > datetime.now():
+        if (name in ulist.ids):
+            person = ulist.find(name)
+            if person.protected > datetime.now():
                 post_params['text'] = 'Sorry, ' + person.nickname + ' is protected.'
                 send_message(post_params)
                 return
-        except:
-            if ulist.findByName(name).protected > datetime.now():
-                post_params['text'] = 'Sorry, ' + person.nickname + ' is protected.'
-                send_message(post_params)
-                return
+            else:
+                add_list.append(name)
             
-        if (name.isdigit() and len(name)==8 and name in list(ulist.ids)):
-            add_list.append(name)
         else:
-            add_list.append(ulist.findByName(name).user_id)
+            person = ulist.findByName(name)
+            if person.protected > datetime.now():
+                post_params['text'] = 'Sorry, ' + person.nickname + ' is protected.'
+                send_message(post_params)
+                return
+            else:
+                add_list.append(ulist.findByName(name).user_id)     
+        
     if len(add_list) == 0:
         return
     if add_list.count('0') > 1:
