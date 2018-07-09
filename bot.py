@@ -7,13 +7,26 @@ from datetime import datetime, timedelta
 
 class User:
     """Users information"""    
-    def __init__(self, user_id, name, nickname, realness = 0, abilities = []):
+    def __init__(self, user_id, name, nickname, realness = 0, abilities = [], protected = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")):
         self.user_id = user_id
         self.name = name
         self.nickname = nickname
         self.realness = realness
         self.abilities = abilities
+        self.protected = protected
+        self.switch = {"protect" : "self.protect(ability.val)"}
+        self.datetime_read()
+        self.ability_read()
+        self.properties = self.__dict__().keys()
         
+    def __dict__(self):
+        return {"user_id": self.user_id, 
+                "name": self.name, 
+                "nickname": self.nickname, 
+                "realness": self.realness,
+                "abilities": self.ability_write(),
+                "protected": self.datetime_write()}
+    
     def add_realness(self):
         self.realness += 1
     
@@ -21,18 +34,71 @@ class User:
         self.realness -= 1
     
     def add_ability(self, ability):
-        self.abilities += ability
+        self.abilities += [ability]
         
     def remove_ability(self, ability):
-        self.abilities.remove("ability")
+        self.abilities.remove(ability)
         
     def changeNickname(self, nickname):
         self.nickname = nickname
         
+    def use_ability(self, rest):
+        if len(rest) == 2 and rest[1].isdigit():
+            for ability in self.abilities:
+                if (rest[0] == ability.type and int(rest[1]) == ability.val):
+                    self.remove_ability(ability)
+                    exec(self.switch[ability.type])
+                    post_params['text'] = "Upgrade used"
+                    send_message(post_params)
+                    return
+            post_params['text'] = "You don't have that ability"
+            send_message(post_params)
+        else:
+            post_params['text'] = "I'm not sure what ability that is"
+            send_message(post_params)
+                
+    def protect(self, time):
+        self.protected = datetime.now() + timedelta(hours = time)
+        
+    def datetime_write(self):
+        return self.protected.strftime("%Y-%m-%d %H:%M:%S.%f")
+            
+    def datetime_read(self):
+        self.protected = datetime.strptime(self.protected, "%Y-%m-%d %H:%M:%S.%f")
+        
+    def ability_write(self):
+        return [(i.type, i.val) for i in self.abilities]
+    
+    def ability_read(self):
+        self.abilities = [Ability(i[0],i[1]) for i in self.abilities]
+        
+    def value(self, val):
+        if val not in self.properties:
+            post_params['text'] = ("The properties are:\n" +
+                                    "user_id\n" +
+                                    "name\n" +
+                                    "nickname\n" +
+                                    "realness\n" +
+                                    "abilities\n" +
+                                    "protected")
+            send_message(post_params)
+        else:
+            post_params['text'] = str(self.__dict__()[val])
+            send_message(post_params)
+        
+
+    
+class Ability:
+    def __init__(self, typ, val):
+        self.type = typ
+        self.val = val
         
 class UserList:
     def __init__(self, udict):
-        self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities']) for i in udict]
+        try:
+            self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected']) for i in udict]
+        except:
+            self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness']) for i in udict]
         self.ids = [i['user_id'] for i in udict]
         self.names = [i['name'] for i in udict]
         self.nicknames = [i['nickname'] for i in udict]
@@ -119,6 +185,10 @@ class Message:
         return len(self.liked)
 
 
+def myconverter(o):
+    if isinstance(o, datetime.datetime):
+        return o.__str__()
+
 #loads token and group_id
 def auth_load():
     with open(os.path.abspath('auth.json'),'r') as auth:
@@ -135,7 +205,7 @@ def users_load():
     
 def users_write(ulist):
     with open(os.path.abspath('users2.json'),'w') as users:
-        users.write(json.dumps([i.__dict__ for i in ulist.ulist]))
+        users.write(json.dumps([i.__dict__() for i in ulist.ulist]))
 
 #loads last message checked
 def last_load():
@@ -165,14 +235,23 @@ def remove_mention_text(message,ulist):
 #changes realness in dictionary, updates
 def adjust_realness(newid, ulist, message, reason):
     global post_params
+    person = ulist.find(newid)
+    
     if newid == message.sender_id:
         post_params['text'] = 'You can\'t change your own realness.'
         send_message(post_params)
         return False
     elif reason == 'add':
-        ulist.find(newid).add_realness()
+        person.add_realness()
+        return True
     elif reason == 'subtract':
-        ulist.find(newid).subtract_realness()
+        if person.protected > datetime.now():
+            post_params['text'] = 'Sorry, ' + person.nickname + ' is protected.'
+            send_message(post_params)
+            return False
+        else:
+            person.subtract_realness()
+            return True
     users_write(ulist)
     return True
  
@@ -181,6 +260,17 @@ def text_change_realness(names, ulist, message, reason):
     global post_params
     add_list = []
     for name in names:
+        try:
+            if ulist.find(name).protected > datetime.now():
+                post_params['text'] = 'Sorry, ' + person.nickname + ' is protected.'
+                send_message(post_params)
+                return
+        except:
+            if ulist.findByName(name).protected > datetime.now():
+                post_params['text'] = 'Sorry, ' + person.nickname + ' is protected.'
+                send_message(post_params)
+                return
+            
         if (name.isdigit() and len(name)==8 and name in list(ulist.ids)):
             add_list.append(name)
         else:
@@ -193,7 +283,7 @@ def text_change_realness(names, ulist, message, reason):
         return
     if reason == 'add':
         text = 'Real '
-    elif reason == 'subtract':
+    elif reason == 'subtract':        
         text = 'Not Real '        
     for newid in add_list:
         if adjust_realness(newid, ulist, message, reason):
@@ -236,8 +326,7 @@ def read_messages(request_params, group_id, ulist):
         else:
             commands(mess, userlist)
             done = ulist.update(mess)
-            if done:
-                users_write(ulist)
+            users_write(ulist)
                 
     if len(message_list) > 0:
         last_write(message_list[0].id)
@@ -315,6 +404,7 @@ def very_real(text, message, ulist, nameslist):
     if len(text.split('very real')[1]) == 0:
         post_params['text'] = 'Nothing to add realness to.'
         send_message(post_params)
+        return
     if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
         nameslist = message.attachments[0]['user_ids']
         nameslist += remove_mention_text(message,ulist).split()[2:]
@@ -327,6 +417,7 @@ def not_real(text, message, ulist, nameslist):
     if len(text.split('not real')[1]) == 0:
         post_params['text'] = 'Nothing to add realness to.'
         send_message(post_params)
+        return
     if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
         nameslist = message.attachments[0]['user_ids']
         nameslist += remove_mention_text(message,ulist).split()[2:]
@@ -335,6 +426,27 @@ def not_real(text, message, ulist, nameslist):
     text_change_realness(nameslist, ulist, message, 'subtract')
     
     
+def shop(text, message, ulist):
+    text = text[1].strip().split(' ') 
+    if text[0] in ['protect']:
+        person = ulist.find(message.sender_id)
+        if (len(text) > 1 and text[1].isdigit()): 
+            if person.realness > 10 * int(text[1]):
+                person.add_ability(Ability(text[0], int(text[1])))
+                person.realness -= 10 * int(text[1])
+                
+                post_params['text'] = "Ok, 1 " +text[0]+ " ability. That'll last yah " + text[1] + ' hours.'
+                send_message(post_params)
+            else:
+                post_params['text'] = 'Fuck off peasant.'
+                send_message(post_params)
+        else:
+            post_params['text'] = 'I think you messed up how long you want this effect for?'
+            send_message(post_params)
+    else:
+        post_params['text'] = "I don't have that ability for sale... yet."
+        send_message(post_params)
+            
 #checks for last message and runs commands
 def commands(message, ulist):
     global post_params
@@ -345,36 +457,58 @@ def commands(message, ulist):
         cancel_timer(message.user_id)
     elif (message.text.lower().startswith('@rb')):
             text = message.text.split('@rb ')
-            if len(text) > 1:    
-                text = text[1]
-                nameslist=[]
                 
-                if (len(text) == 1):
-                    helper_main(post_params)
-                    
-                elif text.lower().startswith('very real'):
-                    very_real(text, message, ulist, nameslist)
-                    
-                elif text.lower().startswith('not real'):
-                    not_real(text, message, ulist, nameslist)
-                    
-                elif text.lower() == 'rankings' or text.lower() == 'ranking':
-                    ulist.ranking(post_params)
-                    
-                elif text.lower().startswith('timer'):
-                    set_timer(text, message)
-                        
-                elif (text.lower().startswith("help")):
-                    helper_specific(post_params, text)
-                    
-                elif (text.lower().startswith('here')):
-                    cancel_timer(message.user_id)
+            if (len(text) == 1):
+                helper_main(post_params)
+                return
+            text = text[1]
+            nameslist=[]
+
+            if text.lower().startswith('very real'):
+                very_real(text, message, ulist, nameslist)
                 
+            elif text.lower().startswith('not real'):
+                not_real(text, message, ulist, nameslist)
+                
+            elif text.lower() == 'rankings' or text.lower() == 'ranking':
+                ulist.ranking(post_params)
+                
+            elif text.lower().startswith('timer'):
+                set_timer(text, message)
+                    
+            elif (text.lower().startswith("help")):
+                helper_specific(post_params, text)
+                
+            elif (text.lower().startswith('here')):
+                cancel_timer(message.user_id)
+            
+            elif (text.lower().startswith('shop')):
+                shop((text.split('shop')), message, ulist)
+                
+            elif (text.lower().startswith('use')):
+                rest = text.split('use')[1].strip().split(' ')
+                ulist.find(message.sender_id).use_ability(rest)
+                
+            elif (text.lower().startswith('@') and message.attachments[0] != []):
+                user = message.attachments[0]['user_ids']
+                if len(user) > 1:
+                    post_params['text'] = "One person at a time please"
+                    send_message(post_params)
                 else:
-                    helper_main(post_params)
-#            elif (text.lower().startswith('shop'))
+                    loc = message.attachments[0]['loci'][0]
+                    rest = text.lower()[(loc[0] + loc[1]) - 3 : ]
+                    rest = rest.strip().split(' ')
+                    if (len(rest) < 1):
+                        post_params['text'] = "This call should look like:\n @rb @LusciousBuck abilities"
+                        send_message(post_params)
+                    else:
+                        ulist.find(user[0]).value(rest[0])
+            elif (len(text.lower().strip().split(' ')) == 2 and text.lower().strip().split(' ')[0] in ulist.names):
+                rest = text.lower().strip().split(' ')
+                ulist.findByName(rest[0]).value(rest[1])
             else:
                 helper_main(post_params)
+
       
                 
 def run():
