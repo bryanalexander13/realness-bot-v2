@@ -262,6 +262,15 @@ def text_change_realness(names, ulist, message, reason):
     global post_params
     realness_list = []
     dmultiplier = 1
+    for i, name in enumerate(names):
+        try:
+            if (int(name) < 1 and i != 0):
+                del names[i-1]
+                names.remove(name)
+                post_params['text']= 'That doesn\'t make sense'
+                send_message(post_params)
+        except:
+            continue
     multiplier_bool = [bool(name.isdigit() and name not in ulist.ids) for name in names]
     for i,name in enumerate(names):
         if (name.isdigit() and len(name)==8 and name in ulist.ids):
@@ -293,10 +302,7 @@ def text_change_realness(names, ulist, message, reason):
     elif type == 'subtract':
         text = 'Not Real '
     for actual_id in [id_tuple for id_tuple in realness_list if (id_tuple[0] != '0')]:
-        if actual_id[1] < 1:
-            post_params['text'] = 'That doesn\'t make sense'
-            send_message(post_params)
-        elif adjust_realness(actual_id[0], ulist, message, type) == False:
+        if adjust_realness(actual_id[0], ulist, message, type) == False:
             continue
         else:
             [adjust_realness(actual_id[0], ulist, message, type) for x in range(actual_id[1]-1)]
@@ -521,19 +527,19 @@ def commands(message, ulist):
 
             if text.startswith('very real'):
                 very_real(text, message, ulist, nameslist)
- 
+
             elif text.startswith('not real'):
                 not_real(text, message, ulist, nameslist)
-                
+
             elif text in ['ranking', 'rankings', 'r']:
                 ulist.ranking(post_params)
-                
+
             elif text.startswith('timer'):
                 set_timer(text, message)
-                    
+
             elif (text.startswith("help")):
                 helper_specific(post_params, text)
-                
+
             elif (text.startswith('here')):
                 cancel_timer(message.user_id)
 
