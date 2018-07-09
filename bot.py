@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 
 class User:
-    """Users information"""    
+    """Users information"""
     def __init__(self, user_id, name, nickname, realness = 0, abilities = [], protected = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")):
         self.user_id = user_id
         self.name = name
@@ -18,30 +18,30 @@ class User:
         self.datetime_read()
         self.ability_read()
         self.properties = self.__dict__().keys()
-        
+
     def __dict__(self):
-        return {"user_id": self.user_id, 
-                "name": self.name, 
-                "nickname": self.nickname, 
+        return {"user_id": self.user_id,
+                "name": self.name,
+                "nickname": self.nickname,
                 "realness": self.realness,
                 "abilities": self.ability_write(),
                 "protected": self.datetime_write()}
-    
+
     def add_realness(self):
         self.realness += 1
-    
+
     def subtract_realness(self):
         self.realness -= 1
-    
+
     def add_ability(self, ability):
         self.abilities += [ability]
-        
+
     def remove_ability(self, ability):
         self.abilities.remove(ability)
-        
+
     def changeNickname(self, nickname):
         self.nickname = nickname
-        
+
     def use_ability(self, rest):
         if len(rest) == 2 and rest[1].isdigit():
             for ability in self.abilities:
@@ -56,22 +56,22 @@ class User:
         else:
             post_params['text'] = "I'm not sure what ability that is"
             send_message(post_params)
-                
+
     def protect(self, time):
         self.protected = datetime.now() + timedelta(hours = time)
-        
+
     def datetime_write(self):
         return self.protected.strftime("%Y-%m-%d %H:%M:%S.%f")
-            
+
     def datetime_read(self):
         self.protected = datetime.strptime(self.protected, "%Y-%m-%d %H:%M:%S.%f")
-        
+
     def ability_write(self):
         return [(i.type, i.val) for i in self.abilities]
-    
+
     def ability_read(self):
         self.abilities = [Ability(i[0],i[1]) for i in self.abilities]
-        
+
     def value(self, val):
         if val not in self.properties:
             post_params['text'] = ("The properties are:\n" +
@@ -85,14 +85,14 @@ class User:
         else:
             post_params['text'] = str(self.__dict__()[val])
             send_message(post_params)
-        
 
-    
+
+
 class Ability:
     def __init__(self, typ, val):
         self.type = typ
         self.val = val
-        
+
 class UserList:
     def __init__(self, udict):
         try:
@@ -103,29 +103,29 @@ class UserList:
         self.names = [i['name'] for i in udict]
         self.nicknames = [i['nickname'] for i in udict]
         self.realness = [i['user_id'] for i in udict]
-    
+
     def find(self, user_id):
         try:
             return [i for i in self.ulist if i.user_id == user_id][0]
         except:
             return User("0", "invalid", "invalid")
-    
+
     def findByName(self, name):
         try:
             return [i for i in self.ulist if i.name == name][0]
         except:
             return User("0", "invalid", "invalid")
-        
+
     def findByNickname(self, nickname):
         try:
             return [i for i in self.ulist if i.nickname == nickname][0]
         except:
             return User("0", "invalid", "invalid")
-        
+
     def add(self, user):
         self.ulist += user
         self.ids += user.user_id
-        
+
     def remove(self, user_id):
         user = self.find(user_id)
         try:
@@ -133,14 +133,14 @@ class UserList:
             self.ulist.remove(user)
         except:
             return
-        
+
     def ranking(self, post_params):
         text = 'The current realness levels are: \n'
         for user in sorted(self.ulist, key=lambda x: x.realness, reverse=True):
             text += user.nickname +': '+ str(user.realness) + '\n'
         post_params['text'] = text
         send_message(post_params)
-    
+
     def update(self, message):
         user = self.find(message.sender_id)
         if user.nickname == message.name:
@@ -148,8 +148,8 @@ class UserList:
         else:
             user.nickname = message.name
             return True
-    
-    
+
+
 class Message:
     """A message handler"""
 
@@ -202,7 +202,7 @@ def users_load():
         file = users.readlines()
         data = json.loads(file[0])
         return data
-    
+
 def users_write(ulist):
     with open(os.path.abspath('users2.json'),'w') as users:
         users.write(json.dumps([i.__dict__() for i in ulist.ulist]))
@@ -236,7 +236,7 @@ def remove_mention_text(message,ulist):
 def adjust_realness(newid, ulist, message, reason):
     global post_params
     person = ulist.find(newid)
-    
+
     if newid == message.sender_id:
         post_params['text'] = 'You can\'t change your own realness.'
         send_message(post_params)
@@ -254,48 +254,55 @@ def adjust_realness(newid, ulist, message, reason):
             return True
     users_write(ulist)
     return True
- 
+
+
+
 #filters through ids and text names to adjust user dictionary, updates new dictionary
 def text_change_realness(names, ulist, message, reason):
     global post_params
-    add_list = []
-    for name in names:
-        if (name in ulist.ids):
-            person = ulist.find(name)
-            if person.protected > datetime.now():
-                post_params['text'] = 'Sorry, ' + person.nickname + ' is protected.'
-                send_message(post_params)
-                return
-            else:
-                add_list.append(name)
-            
+    realness_list = []
+    dmultiplier = 1
+    multiplier_bool = [bool(name.isdigit() and name not in ulist.ids) for name in names]
+    print(names)
+    print(multiplier_bool)
+    for i,name in enumerate(names):
+        if (name.isdigit() and len(name)==8 and name in ulist.ids):
+            try:
+                if multiplier_bool[i+1]:
+                    realness_list.append((name,int(names[i+1])))
+                else:
+                    realness_list.append((name,dmultiplier))
+            except IndexError:
+                realness_list.append((name,dmultiplier))
+        elif (name.isdigit() and name not in ulist.ids):
+            continue
         else:
-            person = ulist.findByName(name)
-            if person.protected > datetime.now():
-                post_params['text'] = 'Sorry, ' + person.nickname + ' is protected.'
-                send_message(post_params)
-                return
-            else:
-                add_list.append(ulist.findByName(name).user_id)     
-        
-    if len(add_list) == 0:
-        return
-    if add_list.count('0') > 1:
+            try:
+                if multiplier_bool[i+1]:
+                    realness_list.append((ulist.findByName(name).user_id,int(names[i+1])))
+                else:
+                    realness_list.append((ulist.findByName(name).user_id,dmultiplier))
+            except:
+                realness_list.append((ulist.findByName(name).user_id,dmultiplier))
+
+    if [x[0] for x in realness_list].count('0') > 1:
         post_params['text'] = 'Invalid IDs'
         send_message(post_params)
         return
-    if reason == 'add':
+    text = str()
+    if type == 'add':
         text = 'Real '
-    elif reason == 'subtract':        
-        text = 'Not Real '        
-    for newid in add_list:
-        if adjust_realness(newid, ulist, message, reason):
-            text += ulist.find(newid).name.capitalize() + '. '
-    #post final message
+    elif type == 'subtract':
+        text = 'Not Real '
+    for actual_id in [id_tuple for id_tuple in realness_list if (id_tuple[0] != '0')]:
+        if adjust_realness(actual_id[0], ulist, message, type) == False:
+            continue
+        else:
+            [adjust_realness(actual_id[0], ulist, message, type) for x in range(actual_id[1]-1)]
+            text += ulist.find(actual_id[0]).name.capitalize() + ' '+ str(actual_id[1]) + '. '
     post_params['text'] = text
     send_message(post_params)
-    #terminal carter handling
-    if (reason == 'subtract' and ulist.findByName("carter").user_id in add_list):
+    if (reason == 'subtract' and ulist.findByName("carter").user_id in realness_list):
         post_params['text'] = 'It is terminal.'
         send_message(post_params)
 
@@ -304,8 +311,8 @@ def read_messages(request_params, group_id, ulist):
     response_messages = requests.get('https://api.groupme.com/v3/groups/{}/messages'.format(group_id), params = request_params).json()['response']['messages']
     message_list=[]
     last = last_load()
-    
-    
+
+
     for message in response_messages:
         if int(message['id']) <= int(last):
             break
@@ -323,17 +330,17 @@ def read_messages(request_params, group_id, ulist):
                         message['text'],
                         message['user_id'])
         message_list.append(mess)
-        
+
         if mess.sender_type == 'bot' or mess.sender_type == 'system':
             continue
         else:
             commands(mess, userlist)
             done = ulist.update(mess)
             users_write(ulist)
-                
+
     if len(message_list) > 0:
         last_write(message_list[0].id)
-        
+
     return message_list
 
 #Just slap this shit in here
@@ -357,7 +364,7 @@ def set_timer(text, message):
     else:
         post_params['text'] = "I don't know who that is"
         send_message(post_params)
-        
+
 
 def cancel_timer(user_id):
     global timer
@@ -369,8 +376,8 @@ def cancel_timer(user_id):
     if t:
         post_params['text'] = "Finally"
         send_message(post_params)
-    
-    
+
+
 def helper_main(post_params):
     post_params['text'] = ("These are the following commands:\n" +
                                       "not real [@mention]\n" +
@@ -401,43 +408,43 @@ def helper_specific(post_params, text):
             send_message(post_params)
     else:
         helper_main(post_params)
-        
+
 
 def very_real(text, message, ulist, nameslist):
     if len(text.split('very real')[1]) == 0:
         post_params['text'] = 'Nothing to add realness to.'
         send_message(post_params)
-        return
-    if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
-        nameslist = message.attachments[0]['user_ids']
-        nameslist += remove_mention_text(message,ulist).split()[2:]
+    if (message.attachments!= [] and message.attachments[0]['type'] == 'mentions'):
+        for i, id in enumerate(message.attachments[0]['user_ids']):
+            text = text.replace(message.text[message.attachments[0]['loci'][i][0] : message.attachments[0]['loci'][i][0]+message.attachments[0]['loci'][i][1]],id)
+        nameslist = text.lower().split('very real')[1].split()
     else:
-        nameslist += text.lower().split()[2:]
+        nameslist = text.lower().split('very real')[1].split()
     text_change_realness(nameslist, ulist, message, 'add')
-    
-    
+
+
 def not_real(text, message, ulist, nameslist):
     if len(text.split('not real')[1]) == 0:
         post_params['text'] = 'Nothing to add realness to.'
         send_message(post_params)
-        return
-    if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
-        nameslist = message.attachments[0]['user_ids']
-        nameslist += remove_mention_text(message,ulist).split()[2:]
+    if (message.attachments!= [] and message.attachments[0]['type'] == 'mentions'):
+        for i, id in enumerate(message.attachments[0]['user_ids']):
+            text = text.replace(message.text[message.attachments[0]['loci'][i][0] : message.attachments[0]['loci'][i][0]+message.attachments[0]['loci'][i][1]],id)
+        nameslist = text.lower().split('not real')[1].split()
     else:
-        nameslist += text.lower().split()[2:]
+        nameslist = text.lower().split('not real')[1].split()
     text_change_realness(nameslist, ulist, message, 'subtract')
-    
-    
+
+
 def shop(text, message, ulist):
-    text = text[1].strip().split(' ') 
+    text = text[1].strip().split(' ')
     if text[0] in ['protect']:
         person = ulist.find(message.sender_id)
-        if (len(text) > 1 and text[1].isdigit()): 
+        if (len(text) > 1 and text[1].isdigit()):
             if person.realness > 10 * int(text[1]):
                 person.add_ability(Ability(text[0], int(text[1])))
                 person.realness -= 10 * int(text[1])
-                
+
                 post_params['text'] = "Ok, 1 " +text[0]+ " ability. That'll last yah " + text[1] + ' hours.'
                 send_message(post_params)
             else:
@@ -449,18 +456,18 @@ def shop(text, message, ulist):
     else:
         post_params['text'] = "I don't have that ability for sale... yet."
         send_message(post_params)
-            
+
 #checks for last message and runs commands
 def commands(message, ulist):
     global post_params
-   
+
     if message.text == None:
         return
     elif message.text.lower().startswith('here'):
         cancel_timer(message.user_id)
     elif (message.text.lower().startswith('@rb')):
             text = message.text.split('@rb ')
-                
+
             if (len(text) == 1):
                 helper_main(post_params)
                 return
@@ -469,29 +476,29 @@ def commands(message, ulist):
 
             if text.lower().startswith('very real'):
                 very_real(text, message, ulist, nameslist)
-                
+
             elif text.lower().startswith('not real'):
                 not_real(text, message, ulist, nameslist)
-                
+
             elif text.lower() == 'rankings' or text.lower() == 'ranking':
                 ulist.ranking(post_params)
-                
+
             elif text.lower().startswith('timer'):
                 set_timer(text, message)
-                    
+
             elif (text.lower().startswith("help")):
                 helper_specific(post_params, text)
-                
+
             elif (text.lower().startswith('here')):
                 cancel_timer(message.user_id)
-            
+
             elif (text.lower().startswith('shop')):
                 shop((text.split('shop')), message, ulist)
-                
+
             elif (text.lower().startswith('use')):
                 rest = text.split('use')[1].strip().split(' ')
                 ulist.find(message.sender_id).use_ability(rest)
-                
+
             elif (text.lower().startswith('@') and message.attachments[0] != []):
                 user = message.attachments[0]['user_ids']
                 if len(user) > 1:
@@ -512,21 +519,21 @@ def commands(message, ulist):
             else:
                 helper_main(post_params)
 
-      
-                
+
+
 def run():
     global request_params
     global group_id
     global userlist
     global timer
-    
+
     while (1 == True):
         message_list = read_messages(request_params, group_id, userlist)
-        
+
         if (len(timer) > 0 and timer[0][0] and timer[0][1] < datetime.now()):
             post_params['text'] = "Hey Retard. You're Late."
             send_message(post_params)
-            
+
             for val in [timer[0][2] for i in range(49)]:
                 adjust_realness(val, userlist, timer[0][3], 'subtract')
             text_change_realness([timer[0][2]], userlist, timer[0][3], 'subtract')
@@ -535,6 +542,7 @@ def run():
         time.sleep(1)
 
 if __name__ == "__main__":
+
     user_dict = users_load()
     userlist = UserList(user_dict)
     auth = auth_load()
@@ -542,7 +550,6 @@ if __name__ == "__main__":
     request_params = {'token':auth[0]}
     post_params = {'text':'','bot_id':auth[2],'attachments':[]}
     timer = []
-
     text = 'The current realness levels are: \n'
     for user in sorted(userlist.ulist, key=lambda x: x.realness):
         text += user.nickname +': ' + str(user.realness) + '\n'
