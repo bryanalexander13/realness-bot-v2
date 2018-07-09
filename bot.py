@@ -376,29 +376,73 @@ def helper_main(post_params):
                                       "not real [@mention]\n" +
                                       "very real [@mention]\n" +
                                       "timer [@mention] [time]\n" +
+                                      "shop [item] [time]\n" +
+                                      "use [ability] [time]\n" +
+                                      "help [command]\n" +
                                       "ranking")
     send_message(post_params)
 
 
 def helper_specific(post_params, text):
     reason = text.lower().split(" ")[1:]
-    if (len(reason) == 2):
+    if (len(reason) == 1):
         if (reason[0] == "not"):
             post_params['text'] = ("The not real command is used to shame a user for their lack of realness\n" +
-                      "Example: @db not real Carter")
+                      "Example: @rb not real Carter")
             send_message(post_params)
         elif (reason[0] == "very"):
             post_params['text'] = ("The very real command is used to reward a user for their excess of realness\n" +
-                      "Example: @db very real Carter")
+                      "Example: @rb very real Carter")
             send_message(post_params)
         elif (reason[0] == "ranking"):
             post_params['text'] = ("The ranking command shows how real everyone is\n" +
-                      "Example: @db ranking")
+                      "Example: @rb ranking")
             send_message(post_params)
         elif (reason[0] == "timer"):
             post_params['text'] = ("Set a timer in minutes so people aren't late\n" +
-                      "Example: @db timer @LusciousBuck 10")
+                      "Example: @rb timer @LusciousBuck 10")
             send_message(post_params)
+        elif (reason[0] == 'shop'):
+            post_params['text'] = ("Shop for radical abilities dude\n" +
+                      "Example: @rb shop protect 10")
+            send_message(post_params)
+        elif (reason[0] == 'use'):
+            post_params['text'] = ("Use you radical abilities dude\n" +
+                      "Example: @rb use protect 10")
+            send_message(post_params)
+        elif (reason[0] == 'help'):
+            post_params['text'] = ("The help command has 3 uses:\n\n" +
+                      "help [command]: find info on how to call commands and what they do\n\n" +
+                      "help shop [item]: find info on abilities in the shop\n\n" +
+                      "help ability [ability]: find info on what abilities do")
+            send_message(post_params)
+        else:
+            helper_main(post_params)
+    elif (len(reason) == 2):
+        if (reason[0] == 'shop'):
+            if (reason[1] == 'protect'):
+                post_params['text'] = ("The protect ability is 10rp per hour")
+                send_message(post_params)
+            else:
+                post_params['text'] = ("Sorry, that's not an ability for sale")
+                send_message(post_params)
+        elif (reason[0] == 'ability'):
+            if (reason[1] == 'protect'):
+                post_params['text'] = ("The protect ability protects you from losing rp")
+                send_message(post_params)
+            else:
+                post_params['text'] = ("Sorry, that's not an ability")
+                send_message(post_params)
+        elif (reason[0] == 'very' and reason[1] == 'real'):
+            post_params['text'] = ("The very real command is used to reward a user for their excess of realness\n" +
+                      "Example: @rb very real Carter")
+            send_message(post_params)
+        elif (reason[0] == 'not' and reason[1] == 'real'):
+            post_params['text'] = ("The not real command is used to shame a user for their lack of realness\n" +
+                      "Example: @rb not real Carter")
+            send_message(post_params)
+        else:
+            helper_main(post_params)
     else:
         helper_main(post_params)
         
@@ -464,25 +508,25 @@ def commands(message, ulist):
             if (len(text) == 1):
                 helper_main(post_params)
                 return
-            text = text[1]
+            text = text[1].lower().strip()
             nameslist=[]
 
-            if text.lower().startswith('very real'):
+            if text.startswith('very real'):
                 very_real(text, message, ulist, nameslist)
                 
-            elif text.lower().startswith('not real'):
+            elif text.startswith('not real'):
                 not_real(text, message, ulist, nameslist)
                 
-            elif text.lower() == 'rankings' or text.lower() == 'ranking':
+            elif text in ['ranking', 'rankings', 'r']:
                 ulist.ranking(post_params)
                 
-            elif text.lower().startswith('timer'):
+            elif text.startswith('timer'):
                 set_timer(text, message)
                     
-            elif (text.lower().startswith("help")):
+            elif (text.startswith("help")):
                 helper_specific(post_params, text)
                 
-            elif (text.lower().startswith('here')):
+            elif (text.startswith('here')):
                 cancel_timer(message.user_id)
             
             elif (text.lower().startswith('shop')):
@@ -499,15 +543,15 @@ def commands(message, ulist):
                     send_message(post_params)
                 else:
                     loc = message.attachments[0]['loci'][0]
-                    rest = text.lower()[(loc[0] + loc[1]) - 3 : ]
+                    rest = text[(loc[0] + loc[1]) - 3 : ]
                     rest = rest.strip().split(' ')
                     if (len(rest) < 1):
                         post_params['text'] = "This call should look like:\n @rb @LusciousBuck abilities"
                         send_message(post_params)
                     else:
                         ulist.find(user[0]).value(rest[0])
-            elif (len(text.lower().strip().split(' ')) == 2 and text.lower().strip().split(' ')[0] in ulist.names):
-                rest = text.lower().strip().split(' ')
+            elif (len(text.split(' ')) == 2 and text.split(' ')[0] in ulist.names):
+                rest = text.split(' ')
                 ulist.findByName(rest[0]).value(rest[1])
             else:
                 helper_main(post_params)
