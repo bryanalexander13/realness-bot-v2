@@ -1,5 +1,5 @@
 # Fixes:
-#### -
+#### - mentions
 
 # Improvements:
 #### -users and userlist dicts to speed up lookup
