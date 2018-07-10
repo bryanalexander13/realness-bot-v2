@@ -609,7 +609,7 @@ def commands(message, ulist):
                 rest = text.split('use')[1].strip().split(' ')
                 ulist.find(message.sender_id).use_ability(rest)
 
-            elif (text.lower().startswith('@') and message.attachments[0] != []):
+            elif (text.lower().startswith('@') and message.attachments != []):
                 user = message.attachments[0]['user_ids']
                 if len(user) > 1:
                     post_params['text'] = "One person at a time please"
