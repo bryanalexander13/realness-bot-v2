@@ -27,11 +27,11 @@ class User:
                 "abilities": self.ability_write(),
                 "protected": self.datetime_write()}
 
-    def add_realness(self):
-        self.realness += 1
+    def add_realness(self, multiplier):
+        self.realness += 1 * multiplier
 
-    def subtract_realness(self):
-        self.realness -= 1
+    def subtract_realness(self, multiplier):
+        self.realness -= 1 * multiplier
 
     def add_ability(self, ability):
         self.abilities += [ability]
@@ -242,7 +242,7 @@ def remove_mention_text(message, ulist):
     return message_text
 
 #changes realness in dictionary, updates
-def adjust_realness(id, ulist, message, reason):
+def adjust_realness(id, ulist, message, reason, multiplier=1):
     """Adds or subtracts realness from User. Calls add_realness() or
     subtract_realness() of User and find methods of UserList and send_message().
     Calls users_write().
@@ -259,7 +259,7 @@ def adjust_realness(id, ulist, message, reason):
         send_message(post_params)
         return False
     elif reason == 'add':
-        person.add_realness()
+        person.add_realness(multiplier)
         return True
     elif reason == 'subtract':
         if person.protected > datetime.now():
@@ -267,7 +267,7 @@ def adjust_realness(id, ulist, message, reason):
             send_message(post_params)
             return False
         else:
-            person.subtract_realness()
+            person.subtract_realness(multiplier)
             return True
     users_write(ulist)
     return True
@@ -325,7 +325,7 @@ def text_change_realness(names, ulist, message, reason):
         if adjust_realness(actual_id[0], ulist, message, reason) == False:
             continue
         else:
-            [adjust_realness(actual_id[0], ulist, message, reason) for x in range(actual_id[1]-1)]
+            adjust_realness(actual_id[0], ulist, message, reason, actual_id[1]-1)
             text += ulist.find(actual_id[0]).name.capitalize() + ' '+ str(actual_id[1]) + '. '
     if text != 'Real ' and text != 'Not Real ':
         post_params['text'] = text
