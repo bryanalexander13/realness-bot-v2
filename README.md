@@ -1,7 +1,6 @@
 # Fixes:
 #### - mentions
-#### - the way multiple realness adjustments update the user files (should be done all at once)
-#### - close files after opening (memory leak???)
+#### - the way multiple realness adjustments update the user files (should be done all at once) Patched?
 
 
 # Improvements:
