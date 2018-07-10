@@ -263,7 +263,7 @@ def text_change_realness(names, ulist, message, reason):
     dmultiplier = 1
     for i, name in enumerate(names):
         try:
-            if (int(name) < 1 and i != 0):
+            if (int(name) < 1 and i != 0 and name not in ulist.ids):
                 del names[i-1]
                 names.remove(name)
                 post_params['text']= 'That doesn\'t make sense'
@@ -290,7 +290,6 @@ def text_change_realness(names, ulist, message, reason):
                     realness_list.append((ulist.findByName(name).user_id,dmultiplier))
             except:
                 realness_list.append((ulist.findByName(name).user_id,dmultiplier))
-
     if [x[0] for x in realness_list].count('0') > 1:
         post_params['text'] = 'Invalid IDs'
         send_message(post_params)
@@ -391,7 +390,7 @@ def helper_main(post_params):
                                       "timer [@mention] [time]\n" +
                                       "shop [item] [time]\n" +
                                       "use [ability] [time]\n" +
-                                      "help [command]\n" 
+                                      "help [command]\n"
                                       "[@mention] [stat]\n"+
                                       "ranking")
     send_message(post_params)
@@ -473,9 +472,10 @@ def very_real(text, message, ulist, nameslist):
     if len(text.split('very real')[1]) == 0:
         post_params['text'] = 'Nothing to add realness to.'
         send_message(post_params)
-    if (message.attachments!= [] and message.attachments[0]['type'] == 'mentions'):
+
+    if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
         for i, id in enumerate(message.attachments[0]['user_ids']):
-            text = text.replace(message.text[message.attachments[0]['loci'][i][0] : message.attachments[0]['loci'][i][0]+message.attachments[0]['loci'][i][1]],id)
+            text = text.replace((message.text[message.attachments[0]['loci'][i][0] : message.attachments[0]['loci'][i][0]+message.attachments[0]['loci'][i][1]]).lower(),id)
         nameslist = text.lower().split('very real')[1].split()
     else:
         nameslist = text.lower().split('very real')[1].split()
@@ -488,7 +488,7 @@ def not_real(text, message, ulist, nameslist):
         send_message(post_params)
     if (message.attachments!= [] and message.attachments[0]['type'] == 'mentions'):
         for i, id in enumerate(message.attachments[0]['user_ids']):
-            text = text.replace(message.text[message.attachments[0]['loci'][i][0] : message.attachments[0]['loci'][i][0]+message.attachments[0]['loci'][i][1]],id)
+            text = text.replace((message.text[message.attachments[0]['loci'][i][0] : message.attachments[0]['loci'][i][0]+message.attachments[0]['loci'][i][1]]).lower(),id)
         nameslist = text.lower().split('not real')[1].split()
     else:
         nameslist = text.lower().split('not real')[1].split()
