@@ -73,9 +73,8 @@ class User:
         self.abilities = [Ability(i[0],i[1]) for i in self.abilities]
 
     def value(self, val):
-        if val not in self.properties:
+        if val not in self.properties or val == 'user_id':
             post_params['text'] = ("The properties are:\n" +
-                                    "user_id\n" +
                                     "name\n" +
                                     "nickname\n" +
                                     "realness\n" +
@@ -392,7 +391,8 @@ def helper_main(post_params):
                                       "timer [@mention] [time]\n" +
                                       "shop [item] [time]\n" +
                                       "use [ability] [time]\n" +
-                                      "help [command]\n" +
+                                      "help [command]\n" 
+                                      "[@mention] [stat]\n"+
                                       "ranking")
     send_message(post_params)
 
@@ -423,6 +423,14 @@ def helper_specific(post_params, text):
         elif (reason[0] == 'use'):
             post_params['text'] = ("Use you radical abilities dude\n" +
                       "Example: @rb use protect 10")
+            send_message(post_params)
+        elif (reason[0] == 'stats' or reason[0] == 'stat'):
+            post_params['text'] = ("There are six stats to lookup:\n" +
+                       "name\n" +
+                       "nickname\n" +
+                       "realness\n" +
+                       "abilities\n" +
+                       "protected")
             send_message(post_params)
         elif (reason[0] == 'help'):
             post_params['text'] = ("The help command has 3 uses:\n\n" +
