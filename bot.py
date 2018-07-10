@@ -305,8 +305,9 @@ def text_change_realness(names, ulist, message, reason):
         else:
             [adjust_realness(actual_id[0], ulist, message, reason) for x in range(actual_id[1]-1)]
             text += ulist.find(actual_id[0]).name.capitalize() + ' '+ str(actual_id[1]) + '. '
-    post_params['text'] = text
-    send_message(post_params)
+    if text != 'Real ' and text != 'Not Real ':
+        post_params['text'] = text
+        send_message(post_params)
     if (reason == 'subtract' and ulist.findByName("carter").user_id in realness_list):
         post_params['text'] = 'It is terminal.'
         send_message(post_params)
