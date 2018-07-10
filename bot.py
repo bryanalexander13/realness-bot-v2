@@ -364,7 +364,7 @@ def set_timer(text, message):
             post_params['text'] = 'Timer set for ' + rest[0] + ' minutes'
             send_message(post_params)
         else:
-            post_params['text'] = "I don't know when that is" + str(text[name[0] + name[1]-1:])
+            post_params['text'] = "I don't know when that is: '" + str(text[name[0] + name[1]-3:]) + "'"
             send_message(post_params)
     else:
         post_params['text'] = "I don't know who that is"
@@ -593,8 +593,8 @@ def run():
             post_params['text'] = "Hey Retard. You're Late."
             send_message(post_params)
 
-            for val in [timer[0][2] for i in range(49)]:
-                adjust_realness(val, userlist, timer[0][3], 'subtract')
+#            for val in [timer[0][2] for i in range(49)]:
+#                adjust_realness(val, userlist, timer[0][3], 'subtract')
             text_change_realness([timer[0][2]], userlist, timer[0][3], 'subtract')
             del timer[0]
 
