@@ -188,43 +188,53 @@ def myconverter(o):
     if isinstance(o, datetime.datetime):
         return o.__str__()
 
-#loads token and group_id
 def auth_load():
+    """Loads authenitcation data from auth.json.
+    :return str: token, group_id, bot_id"""
     with open(os.path.abspath('auth.json'),'r') as auth:
         file = auth.readlines()
         data = json.loads(file[0])
         return data['token'], data['group_id'], data['bot_id']
 
-
 def users_load():
+    """Loads users from users2.json.
+    :return list: user dictionaries"""
     with open(os.path.abspath('users2.json'),'r') as users:
         file = users.readlines()
         data = json.loads(file[0])
         return data
 
 def users_write(ulist):
+    """Writes user dictionaries to users2.json.
+    :param UserList ulist: user list of User objects"""
     with open(os.path.abspath('users2.json'),'w') as users:
         users.write(json.dumps([i.__dict__() for i in ulist.ulist]))
 
-#loads last message checked
 def last_load():
+    """Loads last message id read.
+    :return str: message id"""
     with open(os.path.abspath('last.json'),'r') as last:
         file = last.readlines()
         data = json.loads(file[0])
         return data['last_read']
 
-#writes json file with last message id
 def last_write(last_message):
+    """Writes last message id to last.json.
+    :param str last_message: last message id"""
     if int(last_message) > int(last_load()):
         with open(os.path.abspath('last.json'),'w') as l:
             l.write(json.dumps({'last_read':last_message}))
 
-#sends a message
 def send_message(post_params):
+    """Sends message to group.
+    :param dict post_params: bot_id, text required"""
     requests.post("https://api.groupme.com/v3/bots/post", params = post_params)
 
-#removes mention text from message
-def remove_mention_text(message,ulist):
+def remove_mention_text(message, ulist):
+    """Removes mention text from message (@nickname).
+    :param Message message: message object to act on
+    :param UserList ulist: user list of User objects
+    :return str: message text"""
     message_text = message.text
     for user in message.attachments[0]['user_ids']:
         mention = '@'+ (ulist.find(user).nickname)
@@ -232,11 +242,19 @@ def remove_mention_text(message,ulist):
     return message_text
 
 #changes realness in dictionary, updates
-def adjust_realness(newid, ulist, message, reason):
+def adjust_realness(id, ulist, message, reason):
+    """Adds or subtracts realness from User. Calls add_realness() or
+    subtract_realness() of User and find methods of UserList and send_message().
+    Calls users_write().
+    :param str id: user id of user to modify
+    :param UserList ulist: user list of User objects
+    :param Message message: message object that calls this function
+    :param reason: type of adjust, add or subtract
+    :return bool: True if success, False if failure"""
     global post_params
-    person = ulist.find(newid)
+    person = ulist.find(id)
 
-    if newid == message.sender_id:
+    if id == message.sender_id:
         post_params['text'] = 'You can\'t change your own realness.'
         send_message(post_params)
         return False
@@ -254,10 +272,14 @@ def adjust_realness(newid, ulist, message, reason):
     users_write(ulist)
     return True
 
-
-
-#filters through ids and text names to adjust user dictionary, updates new dictionary
 def text_change_realness(names, ulist, message, reason):
+    """Adds or Subtracts realness with multiple values. Posts messages with
+    realness updates.  Calls send_message() and adjust_realness(). Uses findByName
+    method of UserList.
+    :param list names: ids with multiplier value following the id
+    :param UserList ulist: user list of User objects
+    :param Message message: message object that calls this function
+    :param reason: type of adjust, add or subtract"""
     global post_params
     realness_list = []
     dmultiplier = 1
@@ -314,10 +336,17 @@ def text_change_realness(names, ulist, message, reason):
 
 #reads messages and creates message_list of Message objects
 def read_messages(request_params, group_id, ulist):
+    """Reads in messages from GroupMe API through requests.get().
+    Converts messages into Message objects. Filters system and bot messages.
+    Updates ulist with update method of UserList.  Calls commands().  Calls
+    last_write().
+    :param dict request_params: dictionary of token
+    :param str group_id: group id
+    :param UserList ulist: user list of User objects
+    :return list: list of Message objects"""
     response_messages = requests.get('https://api.groupme.com/v3/groups/{}/messages'.format(group_id), params = request_params).json()['response']['messages']
     message_list=[]
     last = last_load()
-
 
     for message in response_messages:
         if int(message['id']) <= int(last):
@@ -349,14 +378,21 @@ def read_messages(request_params, group_id, ulist):
 
     return message_list
 
-#Just slap this shit in here
 def start_timer(rest, user_id, message):
+    """Creates timer list of tuples.
+    :param str rest: number of minutes
+    :param str user_id: user id to start timer for
+    :param Message message: message calling this function"""
     global timer
     timer += [(True, datetime.now() + (timedelta(minutes=int(rest[0]))), user_id, message)]
     timer = sorted(timer, key = lambda x:x[1])
 
 
 def set_timer(text, message):
+    """Parses text and calls start_timer() to creat timer.  Sends message with
+    send_message() to alert the person being timed.
+    :param str text: text split from @rb command ##probably needs be updated
+    :param Message message: message calling this function"""
     if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
         name = message.attachments[0]['loci'][0]
         rest = text[name[0] + name[1]-3:].strip().split(" ")
@@ -371,8 +407,9 @@ def set_timer(text, message):
         post_params['text'] = "I don't know who that is"
         send_message(post_params)
 
-
 def cancel_timer(user_id):
+    """Cancels timer.
+    :param str user_id: user id"""
     global timer
     t = False
     for k, u_id in enumerate([j[2] for j in timer]):
@@ -385,6 +422,8 @@ def cancel_timer(user_id):
 
 
 def helper_main(post_params):
+    """Sends message of all commands.
+    :param dict post_params: text, bot_id required"""
     post_params['text'] = ("These are the following commands:\n" +
                                       "not real [@mention]\n" +
                                       "very real [@mention]\n" +
@@ -398,6 +437,9 @@ def helper_main(post_params):
 
 
 def helper_specific(post_params, text):
+    """Sends help message for each command.
+    :param dict post_params: text, bot_id required
+    :param str text: text after @rb command"""
     reason = text.lower().split(" ")[1:]
     if (len(reason) == 1):
         if (reason[0] == "not"):
@@ -469,7 +511,12 @@ def helper_specific(post_params, text):
         helper_main(post_params)
 
 
-def very_real(text, message, ulist, nameslist):
+def very_real(text, message, ulist):
+    """Parses very real text command.  Calls text_change_realness() to add
+    realness.
+    :param str text: text after @rb command
+    :param Message message: message calling this command
+    :param UserList ulist: user list of User objects"""
     if len(text.split('very real')[1]) == 0:
         post_params['text'] = 'Nothing to add realness to.'
         send_message(post_params)
@@ -482,8 +529,12 @@ def very_real(text, message, ulist, nameslist):
         nameslist = text.lower().split('very real')[1].split()
     text_change_realness(nameslist, ulist, message, 'add')
 
-
-def not_real(text, message, ulist, nameslist):
+def not_real(text, message, ulist):
+    """Parses very real text command.  Calls text_change_realness() to subtract
+    realness.
+    :param str text: text after @rb command
+    :param Message message: message calling this command
+    :param UserList ulist: user list of User objects"""
     if len(text.split('not real')[1]) == 0:
         post_params['text'] = 'Nothing to add realness to.'
         send_message(post_params)
@@ -532,13 +583,12 @@ def commands(message, ulist):
                 helper_main(post_params)
                 return
             text = text[1].lower().strip()
-            nameslist=[]
 
             if text.startswith('very real'):
-                very_real(text, message, ulist, nameslist)
+                very_real(text, message, ulist)
 
             elif text.startswith('not real'):
-                not_real(text, message, ulist, nameslist)
+                not_real(text, message, ulist)
 
             elif text in ['ranking', 'rankings', 'r']:
                 ulist.ranking(post_params)
@@ -578,7 +628,6 @@ def commands(message, ulist):
                 ulist.findByName(rest[0]).value(rest[1])
             else:
                 helper_main(post_params)
-
 
 
 def run():

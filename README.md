@@ -1,5 +1,8 @@
 # Fixes:
 #### - mentions
+#### - the way multiple realness adjustments update the user files (should be done all at once)
+#### - close files after opening (memory leak???)
+
 
 # Improvements:
 #### -users and userlist dicts to speed up lookup
@@ -7,6 +10,8 @@
 #### -combine very_real() and not_real() into text_change_realness (possibility of passing list or just a string)
 #### -DOCSTRINGS
 #### -Handling of empty change_realness after trying to give yourself realness
+#### -Normalize variables, ie message to msg, rest and text to text
+
 
 # Additions:
 #### -bomb ability
