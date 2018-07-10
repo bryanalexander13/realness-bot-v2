@@ -295,15 +295,15 @@ def text_change_realness(names, ulist, message, reason):
         send_message(post_params)
         return
     text = str()
-    if type == 'add':
+    if reason == 'add':
         text = 'Real '
-    elif type == 'subtract':
+    elif reason == 'subtract':
         text = 'Not Real '
     for actual_id in [id_tuple for id_tuple in realness_list if (id_tuple[0] != '0')]:
-        if adjust_realness(actual_id[0], ulist, message, type) == False:
+        if adjust_realness(actual_id[0], ulist, message, reason) == False:
             continue
         else:
-            [adjust_realness(actual_id[0], ulist, message, type) for x in range(actual_id[1]-1)]
+            [adjust_realness(actual_id[0], ulist, message, reason) for x in range(actual_id[1]-1)]
             text += ulist.find(actual_id[0]).name.capitalize() + ' '+ str(actual_id[1]) + '. '
     post_params['text'] = text
     send_message(post_params)
