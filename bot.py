@@ -27,11 +27,11 @@ class User:
                 "abilities": self.ability_write(),
                 "protected": self.datetime_write()}
 
-    def add_realness(self, multiplier):
-        self.realness += 1 * multiplier
+    def add_realness(self, multiplier=1):
+        self.realness += multiplier
 
-    def subtract_realness(self, multiplier):
-        self.realness -= 1 * multiplier
+    def subtract_realness(self, multiplier=1):
+        self.realness -= multiplier
 
     def add_ability(self, ability):
         self.abilities += [ability]
