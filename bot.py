@@ -3,9 +3,7 @@ import time
 import json
 import os
 from datetime import datetime, timedelta
-import ps10pr3
-import ps10pr2
-import ps10pr4
+import play4
 
 class User:
     """Users information"""
@@ -196,7 +194,8 @@ def auth_load():
     with open(os.path.abspath('auth.json'),'r') as auth:
         file = auth.readlines()
         data = json.loads(file[0])
-        return data
+    auth.close()    
+    return data
 
 def users_load():
     """Loads users from users2.json.
@@ -204,13 +203,15 @@ def users_load():
     with open(os.path.abspath('users2.json'),'r') as users:
         file = users.readlines()
         data = json.loads(file[0])
-        return data
+    users.close()
+    return data
 
 def users_write(ulist):
     """Writes user dictionaries to users2.json.
     :param UserList ulist: user list of User objects"""
     with open(os.path.abspath('users2.json'),'w') as users:
         users.write(json.dumps([i.__dict__() for i in ulist.ulist]))
+    users.close()
 
 def last_load():
     """Loads last message id read.
@@ -218,7 +219,8 @@ def last_load():
     with open(os.path.abspath('last.json'),'r') as last:
         file = last.readlines()
         data = json.loads(file[0])
-        return data['last_read']
+    last.close()
+    return data['last_read']
 
 def last_write(last_message):
     """Writes last message id to last.json.
@@ -226,6 +228,7 @@ def last_write(last_message):
     if int(last_message) > int(last_load()):
         with open(os.path.abspath('last.json'),'w') as l:
             l.write(json.dumps({'last_read':last_message}))
+        l.close()
 
 def update_everyone(request_params, group_id, ulist, auth):
     group = requests.get('https://api.groupme.com/v3/groups/' +group_id, params = request_params).json()['response']
@@ -591,7 +594,7 @@ def call_all(message, ulist, post_params, request_params, group_id):
 
 
 def play(user_id, user_name, user2_id = '', user2_name = ''):
-    ps10pr3.play_connect4(user_id, user_name, user2_id, user2_name)
+    play4.play_connect4(user_id, user_name, user2_id, user2_name)
 
 
 #checks for last message and runs commands
