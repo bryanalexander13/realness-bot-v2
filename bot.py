@@ -3,7 +3,9 @@ import time
 import json
 import os
 from datetime import datetime, timedelta
-
+import ps10pr3
+import ps10pr2
+import ps10pr4
 
 class User:
     """Users information"""
@@ -42,7 +44,7 @@ class User:
     def changeNickname(self, nickname):
         self.nickname = nickname
 
-    def use_ability(self, rest):
+    def use_ability(self, rest, post_params):
         if len(rest) == 2 and rest[1].isdigit():
             for ability in self.abilities:
                 if (rest[0] == ability.type and int(rest[1]) == ability.val):
@@ -72,7 +74,7 @@ class User:
     def ability_read(self):
         self.abilities = [Ability(i[0],i[1]) for i in self.abilities]
 
-    def value(self, val):
+    def value(self, val, post_params):
         if val not in self.properties or val == 'user_id':
             post_params['text'] = ("The properties are:\n" +
                                     "name\n" +
@@ -97,7 +99,7 @@ class UserList:
         try:
             self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected']) for i in udict]
         except:
-            self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness']) for i in udict]
+            self.ulist = [User(i['user_id'], i["name"], i['nickname']) for i in udict]
         self.ids = [i['user_id'] for i in udict]
         self.names = [i['name'] for i in udict]
         self.nicknames = [i['nickname'] for i in udict]
@@ -194,7 +196,7 @@ def auth_load():
     with open(os.path.abspath('auth.json'),'r') as auth:
         file = auth.readlines()
         data = json.loads(file[0])
-        return data['token'], data['group_id'], data['bot_id']
+        return data
 
 def users_load():
     """Loads users from users2.json.
@@ -225,10 +227,21 @@ def last_write(last_message):
         with open(os.path.abspath('last.json'),'w') as l:
             l.write(json.dumps({'last_read':last_message}))
 
+def update_everyone(request_params, group_id, ulist, auth):
+    group = requests.get('https://api.groupme.com/v3/groups/' +group_id, params = request_params).json()['response']
+    if group['id'] == auth['equipo']['group_id']:
+        for member in group['members']:
+            user = ulist.find(member['id']) 
+            user.nickname = member['nickname']
+    
+def members(request_params, group_id):
+    group = requests.get('https://api.groupme.com/v3/groups/' + group_id, params = request_params).json()['response']
+    return group['members']
+    
 def send_message(post_params):
     """Sends message to group.
     :param dict post_params: bot_id, text required"""
-    requests.post("https://api.groupme.com/v3/bots/post", params = post_params)
+    requests.post("https://api.groupme.com/v3/bots/post", json = post_params)
 
 def remove_mention_text(message, ulist):
     """Removes mention text from message (@nickname).
@@ -242,7 +255,7 @@ def remove_mention_text(message, ulist):
     return message_text
 
 #changes realness in dictionary, updates
-def adjust_realness(id, ulist, message, reason, multiplier=1):
+def adjust_realness(id, ulist, message, reason, post_params, multiplier=1):
     """Adds or subtracts realness from User. Calls add_realness() or
     subtract_realness() of User and find methods of UserList and send_message().
     Calls users_write().
@@ -251,7 +264,6 @@ def adjust_realness(id, ulist, message, reason, multiplier=1):
     :param Message message: message object that calls this function
     :param reason: type of adjust, add or subtract
     :return bool: True if success, False if failure"""
-    global post_params
     person = ulist.find(id)
 
     if id == message.sender_id:
@@ -272,7 +284,7 @@ def adjust_realness(id, ulist, message, reason, multiplier=1):
     users_write(ulist)
     return True
 
-def text_change_realness(names, ulist, message, reason):
+def text_change_realness(names, ulist, message, reason, post_params):
     """Adds or Subtracts realness with multiple values. Posts messages with
     realness updates.  Calls send_message() and adjust_realness(). Uses findByName
     method of UserList.
@@ -280,7 +292,6 @@ def text_change_realness(names, ulist, message, reason):
     :param UserList ulist: user list of User objects
     :param Message message: message object that calls this function
     :param reason: type of adjust, add or subtract"""
-    global post_params
     realness_list = []
     dmultiplier = 1
     for i, name in enumerate(names):
@@ -322,7 +333,7 @@ def text_change_realness(names, ulist, message, reason):
     elif reason == 'subtract':
         text = 'Not Real '
     for actual_id in [id_tuple for id_tuple in realness_list if (id_tuple[0] != '0')]:
-        if adjust_realness(actual_id[0], ulist, message, reason) == False:
+        if adjust_realness(actual_id[0], ulist, message, reason, post_params) == False:
             continue
         else:
             adjust_realness(actual_id[0], ulist, message, reason, actual_id[1]-1)
@@ -335,7 +346,7 @@ def text_change_realness(names, ulist, message, reason):
         send_message(post_params)
 
 #reads messages and creates message_list of Message objects
-def read_messages(request_params, group_id, ulist):
+def read_messages(request_params, group_id, ulist, post_params, auth, timer):
     """Reads in messages from GroupMe API through requests.get().
     Converts messages into Message objects. Filters system and bot messages.
     Updates ulist with update method of UserList.  Calls commands().  Calls
@@ -369,8 +380,8 @@ def read_messages(request_params, group_id, ulist):
         if mess.sender_type == 'bot' or mess.sender_type == 'system':
             continue
         else:
-            commands(mess, userlist)
-            done = ulist.update(mess)
+            commands(mess, ulist, post_params, timer, request_params, group_id)
+            update_everyone(request_params, group_id, ulist, auth)
             users_write(ulist)
 
     if len(message_list) > 0:
@@ -378,17 +389,16 @@ def read_messages(request_params, group_id, ulist):
 
     return message_list
 
-def start_timer(rest, user_id, message):
+def start_timer(rest, user_id, message, timer):
     """Creates timer list of tuples.
     :param str rest: number of minutes
     :param str user_id: user id to start timer for
     :param Message message: message calling this function"""
-    global timer
     timer += [(True, datetime.now() + (timedelta(minutes=int(rest[0]))), user_id, message)]
     timer = sorted(timer, key = lambda x:x[1])
 
 
-def set_timer(text, message):
+def set_timer(text, message, post_params, timer):
     """Parses text and calls start_timer() to creat timer.  Sends message with
     send_message() to alert the person being timed.
     :param str text: text split from @rb command ##probably needs be updated
@@ -397,7 +407,7 @@ def set_timer(text, message):
         name = message.attachments[0]['loci'][0]
         rest = text[name[0] + name[1]-3:].strip().split(" ")
         if (len(rest) == 1 and rest[0].isdigit()):
-            start_timer(rest, message.attachments[0]['user_ids'][0], message)
+            start_timer(rest, message.attachments[0]['user_ids'][0], message, timer)
             post_params['text'] = 'Timer set for ' + rest[0] + ' minutes'
             send_message(post_params)
         else:
@@ -407,10 +417,9 @@ def set_timer(text, message):
         post_params['text'] = "I don't know who that is"
         send_message(post_params)
 
-def cancel_timer(user_id):
+def cancel_timer(user_id, post_params, timer):
     """Cancels timer.
     :param str user_id: user id"""
-    global timer
     t = False
     for k, u_id in enumerate([j[2] for j in timer]):
         if user_id == u_id:
@@ -511,7 +520,7 @@ def helper_specific(post_params, text):
         helper_main(post_params)
 
 
-def very_real(text, message, ulist):
+def very_real(text, message, ulist, post_params):
     """Parses very real text command.  Calls text_change_realness() to add
     realness.
     :param str text: text after @rb command
@@ -527,9 +536,9 @@ def very_real(text, message, ulist):
         nameslist = text.lower().split('very real')[1].split()
     else:
         nameslist = text.lower().split('very real')[1].split()
-    text_change_realness(nameslist, ulist, message, 'add')
+    text_change_realness(nameslist, ulist, message, 'add', post_params)
 
-def not_real(text, message, ulist):
+def not_real(text, message, ulist, post_params):
     """Parses very real text command.  Calls text_change_realness() to subtract
     realness.
     :param str text: text after @rb command
@@ -544,10 +553,10 @@ def not_real(text, message, ulist):
         nameslist = text.lower().split('not real')[1].split()
     else:
         nameslist = text.lower().split('not real')[1].split()
-    text_change_realness(nameslist, ulist, message, 'subtract')
+    text_change_realness(nameslist, ulist, message, 'subtract', post_params)
 
 
-def shop(text, message, ulist):
+def shop(text, message, ulist, post_params):
     text = text[1].strip().split(' ')
     if text[0] in ['protect']:
         person = ulist.find(message.sender_id)
@@ -567,47 +576,81 @@ def shop(text, message, ulist):
     else:
         post_params['text'] = "I don't have that ability for sale... yet."
         send_message(post_params)
+        
+
+def call_all(message, ulist, post_params, request_params, group_id):
+    loci = []
+    user_ids = []
+    people = members(request_params, group_id)
+    for i,person in enumerate(people):
+        loci += [[i,i+1]]
+        user_ids += [person['user_id']]
+    post_params['attachments'] = [{'loci': loci, 'type':'mentions', 'user_ids':user_ids}]#[{'loci': [[0, 1], [2,1], [4,1], [6,1], [8,1], [10,1]], 'type':'mentions', 'user_ids': ulist.nicknames}]
+    post_params['text'] = "@everyone " + message.text.split('@all')[1].strip()
+    send_message(post_params)
+
+
+def play(user_id, user_name, user2_id = '', user2_name = ''):
+    ps10pr3.play_connect4(user_id, user_name, user2_id, user2_name)
+
 
 #checks for last message and runs commands
-def commands(message, ulist):
-    global post_params
-
+def commands(message, ulist, post_params, timer, request_params, group_id):
     if message.text == None:
         return
     elif message.text.lower().startswith('here'):
         cancel_timer(message.user_id)
-    elif (message.text.lower().startswith('@rb')):
+    elif (message.text.lower().startswith("@all") or message.text.lower().startswith("@everyone")):
+        call_all(message, ulist, post_params, request_params, group_id)
+    elif (message.text.lower().strip() == '@rb'):
+        helper_main(post_params)
+    elif (message.text.lower().startswith('@rb ')):
             text = message.text.split('@rb ')
 
-            if (len(text) == 1):
-                helper_main(post_params)
-                return
+#            if (len(text[1].split(' ')) == 1):
+#                helper_main(post_params)
+#                return
             text = text[1].lower().strip()
 
             if text.startswith('very real'):
-                very_real(text, message, ulist)
+                very_real(text, message, ulist, post_params, request_params, group_id)
 
             elif text.startswith('not real'):
-                not_real(text, message, ulist)
+                not_real(text, message, ulist, post_params)
 
             elif text in ['ranking', 'rankings', 'r']:
                 ulist.ranking(post_params)
-
+            
+            elif (text.startswith('play')):
+                t = text.split(' ')
+                if len(t) == 1:
+                    play(message.sender_id, message.name)
+                    return
+                elif (message.attachments[0] != [] and message.attachments[0]['type'] == 'mentions'):
+                    person = message.attachments[0]['user_ids']
+                    if len(person) == 1:
+                        name = ulist.find(person[0]).nickname
+                        play(message.sender_id, message.name, person[0], name)
+                    else:
+                        helper_main(post_params)
+                else:
+                    helper_main(post_params)
+                    
             elif text.startswith('timer'):
-                set_timer(text, message)
+                set_timer(text, message, post_params, timer)
 
             elif (text.startswith("help")):
                 helper_specific(post_params, text)
 
             elif (text.startswith('here')):
-                cancel_timer(message.user_id)
+                cancel_timer(message.user_id, post_params, timer)
 
             elif (text.lower().startswith('shop')):
-                shop((text.split('shop')), message, ulist)
+                shop((text.split('shop')), message, ulist, post_params)
 
             elif (text.lower().startswith('use')):
                 rest = text.split('use')[1].strip().split(' ')
-                ulist.find(message.sender_id).use_ability(rest)
+                ulist.find(message.sender_id).use_ability(rest, post_params)
 
             elif (text.lower().startswith('@') and message.attachments != []):
                 user = message.attachments[0]['user_ids']
@@ -622,7 +665,7 @@ def commands(message, ulist):
                         post_params['text'] = "This call should look like:\n @rb @LusciousBuck abilities"
                         send_message(post_params)
                     else:
-                        ulist.find(user[0]).value(rest[0])
+                        ulist.find(user[0]).value(rest[0], post_params)
             elif (len(text.split(' ')) == 2 and text.split(' ')[0] in ulist.names):
                 rest = text.split(' ')
                 ulist.findByName(rest[0]).value(rest[1])
@@ -630,14 +673,9 @@ def commands(message, ulist):
                 helper_main(post_params)
 
 
-def run():
-    global request_params
-    global group_id
-    global userlist
-    global timer
-
+def run(request_params, post_params, timer, group_id, userlist, auth):
     while (1 == True):
-        message_list = read_messages(request_params, group_id, userlist)
+        message_list = read_messages(request_params, group_id, userlist, post_params, auth, timer)
 
         if (len(timer) > 0 and timer[0][0] and timer[0][1] < datetime.now()):
             post_params['text'] = "Hey Retard. You're Late."
@@ -649,18 +687,24 @@ def run():
             del timer[0]
 
         time.sleep(1)
-
-if __name__ == "__main__":
-
+        
+def startup():
     user_dict = users_load()
     userlist = UserList(user_dict)
     auth = auth_load()
-    group_id = auth[1]
-    request_params = {'token':auth[0]}
-    post_params = {'text':'','bot_id':auth[2],'attachments':[]}
+    bot = auth['equipo']
+    group_id = bot['group_id']
+    request_params = {'token':auth['token']}
+    post_params = {'text':'','bot_id':bot['bot_id'],'attachments':[]}
     timer = []
     text = 'The current realness levels are: \n'
     for user in sorted(userlist.ulist, key=lambda x: x.realness):
         text += user.nickname +': ' + str(user.realness) + '\n'
     print(text)
-    run()
+    run(request_params, post_params, timer, group_id, userlist, auth)
+
+
+if __name__ == "__main__":
+    
+    startup()
+    
