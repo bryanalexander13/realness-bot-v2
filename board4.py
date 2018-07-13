@@ -2,7 +2,7 @@ class Board:
     """ a class to represent a connect four game
     """
 
-    def __init__(self, height, width):
+    def __init__(self, height, width, print_type):
         """ The variables of the board
         input height & width: integers
         """
@@ -10,6 +10,7 @@ class Board:
         self.height = height
         self.width = width
         self.slots = [['  ']*width for r in range(height)]
+        self.type = print_type
 
     def __str__(self):
         """ Returns a string representation for a Board object.
@@ -17,29 +18,59 @@ class Board:
         s = ''         # begin with an empty string
 
         # add one row of slots at a time
-        for row in range(self.height):
-            s += '|  '   # one vertical bar at the start of the row
-
-            for col in range(self.width):
-                s += self.slots[row][col] + '  |  '
-
-            s += '\n'  # newline at the end of the row
-
-        # Add code here for the hyphens at the bottom of the board
-        # and the numbers underneath it.
-
-        s += ((2*self.width + 1) * '----')[:-15]
-
-        s += '\n  '
-
-        ref = 0
-        
-        for i in range(1,2*self.width + 1):
-            if i % 2 == 0:
-                s += '     '
-            else:
-                s += str(ref % 10)
-                ref += 1
+        if self.type == 'phone':
+            for row in range(self.height):
+                s += '|  '   # one vertical bar at the start of the row
+    
+                for col in range(self.width):
+                    s += self.slots[row][col] + '  |  '
+    
+                s += '\n'  # newline at the end of the row
+    
+            # Add code here for the hyphens at the bottom of the board
+            # and the numbers underneath it.
+    
+            s += ((2*self.width + 1) * '----')[:-15]
+    
+            s += '\n  '
+    
+            ref = 0
+            
+            for i in range(1,2*self.width + 1):
+                if i % 2 == 0:
+                    s += '     '
+                else:
+                    s += str(ref % 10)
+                    ref += 1
+                    
+        elif self.type == 'computer':
+            
+            for row in range(self.height):
+                s += '\n|___'   # one vertical bar at the start of the row
+                
+                for col in range(self.width):
+                    if self.slots[row][col] != '  ':
+                        s += self.slots[row][col] + '___|___'
+                    else:
+                        s += '____|___' 
+                s = s[:-3]
+                s += '\n'  # newline at the end of the row
+    
+            # Add code here for the hyphens at the bottom of the board
+            # and the numbers underneath it.
+    
+            #s += ((2*self.width + 1) * '---')
+    
+            s += '\n____'
+    
+            ref = 0
+            
+            for i in range(1,2*self.width):
+                if i % 2 == 0:
+                    s += '_______'
+                else:
+                    s += str(ref % 10)
+                    ref += 1
         
         return s
         

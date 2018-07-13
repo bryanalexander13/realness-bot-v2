@@ -593,8 +593,8 @@ def call_all(message, ulist, post_params, request_params, group_id):
     send_message(post_params)
 
 
-def play(user_id, user_name, user2_id = '', user2_name = ''):
-    play4.play_connect4(user_id, user_name, user2_id, user2_name)
+def play(user_id, user_name, user2_id = '', user2_name = '', print_type = 'phone'):
+    play4.play_connect4(user_id, user_name, user2_id, user2_name, print_type)
 
 
 #checks for last message and runs commands
@@ -623,21 +623,6 @@ def commands(message, ulist, post_params, timer, request_params, group_id):
 
             elif text in ['ranking', 'rankings', 'r']:
                 ulist.ranking(post_params)
-            
-            elif (text.startswith('play')):
-                t = text.split(' ')
-                if len(t) == 1:
-                    play(message.sender_id, message.name)
-                    return
-                elif (message.attachments[0] != [] and message.attachments[0]['type'] == 'mentions'):
-                    person = message.attachments[0]['user_ids']
-                    if len(person) == 1:
-                        name = ulist.find(person[0]).nickname
-                        play(message.sender_id, message.name, person[0], name)
-                    else:
-                        helper_main(post_params)
-                else:
-                    helper_main(post_params)
                     
             elif text.startswith('timer'):
                 set_timer(text, message, post_params, timer)
@@ -654,6 +639,33 @@ def commands(message, ulist, post_params, timer, request_params, group_id):
             elif (text.lower().startswith('use')):
                 rest = text.split('use')[1].strip().split(' ')
                 ulist.find(message.sender_id).use_ability(rest, post_params)
+            
+            elif (text.startswith('play')):
+                t = text.split(' ')
+                if len(t) == 1 or len(t) == 2:
+                    if text.endswith('both'):
+                        play(message.sender_id, message.name, '', '', 'both')
+                    elif text.endswith('computer'):
+                        play(message.sender_id, message.name, '', '', 'computer')
+                    else:
+                        play(message.sender_id, message.name, '', '', 'phone')
+                    return
+                elif (message.attachments[0] != [] and message.attachments[0]['type'] == 'mentions'):
+                    person = message.attachments[0]['user_ids']
+                    if len(person) == 1: 
+                        if text.endswith('both'):
+                            name = ulist.find(person[0]).nickname
+                            play(message.sender_id, message.name, person[0], name, 'both')
+                        elif text.endswith('computer'):
+                            name = ulist.find(person[0]).nickname
+                            play(message.sender_id, message.name, person[0], name, 'computer')
+                        else:
+                            name = ulist.find(person[0]).nickname
+                            play(message.sender_id, message.name, person[0], name, 'phone')
+                    else:
+                        helper_main(post_params)
+                else:
+                    helper_main(post_params)
 
             elif (text.lower().startswith('@') and message.attachments != []):
                 user = message.attachments[0]['user_ids']
@@ -695,7 +707,7 @@ def startup():
     user_dict = users_load()
     userlist = UserList(user_dict)
     auth = auth_load()
-    bot = auth['equipo']
+    bot = auth['test']
     group_id = bot['group_id']
     request_params = {'token':auth['token']}
     post_params = {'text':'','bot_id':bot['bot_id'],'attachments':[]}

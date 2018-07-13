@@ -1,4 +1,4 @@
-from play4 import *
+from player4 import *
 import random
 
 class AIPlayer(Player):

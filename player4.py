@@ -83,7 +83,7 @@ class Player:
                 response = read()
                 if (response[0]['text'].strip() == 'quit' and response[0]['sender_id'] == user_id):
                     return 'quit'
-                if (datetime.datetime.now() - start > datetime.timedelta(0, 30, 0)):
+                if (datetime.datetime.now() - start > datetime.timedelta(0, 60, 0)):
                     return 'quit'
                 
                 col = 200

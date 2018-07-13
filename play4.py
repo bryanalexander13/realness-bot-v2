@@ -27,14 +27,14 @@ def send_message(post_params):
     requests.post("https://api.groupme.com/v3/bots/post", json = post_params)
     
 
-def play_connect4(user_id, user_name, user2_id, user2_name):
+def play_connect4(user_id, user_name, user2_id, user2_name, print_type):
     if user2_id == '':
-        connect_four(Player('x'), aiplayer4.AIPlayer('o', '', 0), user_id, user_name)
+        connect_four(Player('x'), aiplayer4.AIPlayer('o', '', 5), user_id, user_name, user2_id, user2_name, print_type)
     else:
-        connect_four(Player('x'), Player('o'), user_id, user_name, user2_id, user2_name)
+        connect_four(Player('x'), Player('o'), user_id, user_name, user2_id, user2_name, print_type)
 
     
-def connect_four(player1, player2, user_id, user_name, user2_id = '', user2_name = ''):
+def connect_four(player1, player2, user_id, user_name, user2_id, user2_name, print_type):
     """ Plays a game of Connect Four between the two specified players,
         and returns the Board object as it looks at the end of the game.
         inputs: player1 and player2 are objects representing Connect Four
@@ -50,7 +50,7 @@ def connect_four(player1, player2, user_id, user_name, user2_id = '', user2_name
 
 #    print('Welcome to Connect Four!')
 #    print()
-    board = Board(6, 7)
+    board = Board(6, 7, print_type)
 #    print(board)
     post_params['text'] = 'Welcome To Connect 4!\n\n' + str(board)
     send_message(post_params)
