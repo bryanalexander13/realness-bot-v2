@@ -707,7 +707,7 @@ def startup():
     user_dict = users_load()
     userlist = UserList(user_dict)
     auth = auth_load()
-    bot = auth['test']
+    bot = auth['equipo']
     group_id = bot['group_id']
     request_params = {'token':auth['token']}
     post_params = {'text':'','bot_id':bot['bot_id'],'attachments':[]}

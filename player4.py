@@ -81,7 +81,7 @@ class Player:
             while board is not None:
                 #col = int(input('Enter a column: '))
                 response = read()
-                if (response[0]['text'].strip() == 'quit' and response[0]['sender_id'] == user_id):
+                if (response[0]['text'].strip().lower() == 'quit' and response[0]['sender_id'] == user_id):
                     return 'quit'
                 if (datetime.datetime.now() - start > datetime.timedelta(0, 60, 0)):
                     return 'quit'
@@ -98,7 +98,7 @@ class Player:
             while board is not None:
                 #col = int(input('Enter a column: '))
                 response = read()
-                if (response[0]['text'].strip().lower() == 'quit' and response[0]['sender_id'] == user2_id):
+                if (response[0]['text'].strip().lower() == 'quit' or response[0]['sender_id'] == user2_id):
                     return 'quit'
                 if (datetime.datetime.now() - start > datetime.timedelta(0, 60, 0)):
                     return 'quit'

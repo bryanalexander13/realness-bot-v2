@@ -71,6 +71,59 @@ class Board:
                 else:
                     s += str(ref % 10)
                     ref += 1
+        else:
+            for row in range(self.height):
+                s += '|  '   # one vertical bar at the start of the row
+    
+                for col in range(self.width):
+                    s += self.slots[row][col] + '  |  '
+    
+                s += '\n'  # newline at the end of the row
+    
+            # Add code here for the hyphens at the bottom of the board
+            # and the numbers underneath it.
+    
+            s += ((2*self.width + 1) * '----')[:-15]
+    
+            s += '\n  '
+    
+            ref = 0
+            
+            for i in range(1,2*self.width + 1):
+                if i % 2 == 0:
+                    s += '     '
+                else:
+                    s += str(ref % 10)
+                    ref += 1
+            
+            for row in range(self.height):
+                s += '\n|___'   # one vertical bar at the start of the row
+                
+                for col in range(self.width):
+                    if self.slots[row][col] != '  ':
+                        s += self.slots[row][col] + '___|___'
+                    else:
+                        s += '____|___' 
+                s = s[:-3]
+                s += '\n'  # newline at the end of the row
+    
+            # Add code here for the hyphens at the bottom of the board
+            # and the numbers underneath it.
+    
+            #s += ((2*self.width + 1) * '---')
+    
+            s += '\n____'
+    
+            ref = 0
+            
+            for i in range(1,2*self.width):
+                if i % 2 == 0:
+                    s += '_______'
+                else:
+                    s += str(ref % 10)
+                    ref += 1
+            
+            s += '\n\n\n'
         
         return s
         
