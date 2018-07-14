@@ -341,7 +341,7 @@ def text_change_realness(names, ulist, message, reason, post_params):
         elif int(id_tuple[1])-1 == 0:
             text += ulist.find(actual_id[0]).name.capitalize() + ' '+ str(actual_id[1]) + '. '
         else:
-            adjust_realness(actual_id[0], ulist, message, reason, actual_id[1]-1)
+            adjust_realness(actual_id[0], ulist, message, reason, post_params, actual_id[1]-1)
             text += ulist.find(actual_id[0]).name.capitalize() + ' '+ str(actual_id[1]) + '. '
     if text != 'Real ' and text != 'Not Real ':
         post_params['text'] = text
