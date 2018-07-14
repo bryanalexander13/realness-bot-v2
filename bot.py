@@ -194,7 +194,7 @@ def auth_load():
     with open(os.path.abspath('auth.json'),'r') as auth:
         file = auth.readlines()
         data = json.loads(file[0])
-    auth.close()    
+    auth.close()
     return data
 
 def users_load():
@@ -234,13 +234,13 @@ def update_everyone(request_params, group_id, ulist, auth):
     group = requests.get('https://api.groupme.com/v3/groups/' +group_id, params = request_params).json()['response']
     if group['id'] == auth['equipo']['group_id']:
         for member in group['members']:
-            user = ulist.find(member['id']) 
+            user = ulist.find(member['id'])
             user.nickname = member['nickname']
-    
+
 def members(request_params, group_id):
     group = requests.get('https://api.groupme.com/v3/groups/' + group_id, params = request_params).json()['response']
     return group['members']
-    
+
 def send_message(post_params):
     """Sends message to group.
     :param dict post_params: bot_id, text required"""
@@ -338,6 +338,8 @@ def text_change_realness(names, ulist, message, reason, post_params):
     for actual_id in [id_tuple for id_tuple in realness_list if (id_tuple[0] != '0')]:
         if adjust_realness(actual_id[0], ulist, message, reason, post_params) == False:
             continue
+        elif int(id_tuple[1])-1 == 0:
+            text += ulist.find(actual_id[0]).name.capitalize() + ' '+ str(actual_id[1]) + '. '
         else:
             adjust_realness(actual_id[0], ulist, message, reason, actual_id[1]-1)
             text += ulist.find(actual_id[0]).name.capitalize() + ' '+ str(actual_id[1]) + '. '
@@ -579,7 +581,7 @@ def shop(text, message, ulist, post_params):
     else:
         post_params['text'] = "I don't have that ability for sale... yet."
         send_message(post_params)
-        
+
 
 def call_all(message, ulist, post_params, request_params, group_id):
     loci = []
@@ -623,7 +625,7 @@ def commands(message, ulist, post_params, timer, request_params, group_id):
 
             elif text in ['ranking', 'rankings', 'r']:
                 ulist.ranking(post_params)
-                    
+
             elif text.startswith('timer'):
                 set_timer(text, message, post_params, timer)
 
@@ -639,7 +641,7 @@ def commands(message, ulist, post_params, timer, request_params, group_id):
             elif (text.lower().startswith('use')):
                 rest = text.split('use')[1].strip().split(' ')
                 ulist.find(message.sender_id).use_ability(rest, post_params)
-            
+
             elif (text.startswith('play')):
                 t = text.split(' ')
                 if len(t) == 1 or len(t) == 2:
@@ -652,7 +654,7 @@ def commands(message, ulist, post_params, timer, request_params, group_id):
                     return
                 elif (message.attachments[0] != [] and message.attachments[0]['type'] == 'mentions'):
                     person = message.attachments[0]['user_ids']
-                    if len(person) == 1: 
+                    if len(person) == 1:
                         if text.endswith('both'):
                             name = ulist.find(person[0]).nickname
                             play(message.sender_id, message.name, person[0], name, 'both')
@@ -702,7 +704,7 @@ def run(request_params, post_params, timer, group_id, userlist, auth):
             del timer[0]
 
         time.sleep(1)
-        
+
 def startup():
     user_dict = users_load()
     userlist = UserList(user_dict)
@@ -720,6 +722,5 @@ def startup():
 
 
 if __name__ == "__main__":
-    
+
     startup()
-    
