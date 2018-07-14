@@ -616,7 +616,7 @@ def commands(message, ulist, post_params, timer, request_params, group_id):
             text = text[1].lower().strip()
 
             if text.startswith('very real'):
-                very_real(text, message, ulist, post_params, request_params, group_id)
+                very_real(text, message, ulist, post_params)
 
             elif text.startswith('not real'):
                 not_real(text, message, ulist, post_params)
