@@ -7,15 +7,15 @@ import play4
 
 class User:
     """Users information"""
-    def __init__(self, user_id, name, nickname, realness = 0, abilities = [], protected = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")):
+    def __init__(self, user_id, name, nickname, realness = 0, abilities = [], protected = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"), thornmail = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")):
         self.user_id = user_id
         self.name = name
         self.nickname = nickname
         self.realness = realness
         self.abilities = abilities
-        self.protected = protected
-        self.switch = {"protect" : "self.protect(ability.val)"}
-        self.datetime_read()
+        self.protected = self.datetime_read(protected)
+        self.thornmail = self.datetime_read(thornmail)
+        self.switch = {"protect" : "self.protect(ability.val)", "thornmail" : "self.thornmailed(ability.val)"}
         self.ability_read()
         self.properties = self.__dict__().keys()
 
@@ -25,7 +25,8 @@ class User:
                 "nickname": self.nickname,
                 "realness": self.realness,
                 "abilities": self.ability_write(),
-                "protected": self.datetime_write()}
+                "protected": self.datetime_write(self.protected),
+                "thornmail": self.datetime_write(self.thornmail)}
 
     def add_realness(self, multiplier=1):
         self.realness += multiplier
@@ -59,12 +60,15 @@ class User:
 
     def protect(self, time):
         self.protected = datetime.now() + timedelta(hours = time)
+        
+    def thornmailed(self, time):
+        self.thornmail = datetime.now() + timedelta(hours = time)
+        
+    def datetime_write(self, date):
+        return date.strftime("%Y-%m-%d %H:%M:%S.%f")
 
-    def datetime_write(self):
-        return self.protected.strftime("%Y-%m-%d %H:%M:%S.%f")
-
-    def datetime_read(self):
-        self.protected = datetime.strptime(self.protected, "%Y-%m-%d %H:%M:%S.%f")
+    def datetime_read(self, date):
+        return datetime.strptime(date, "%Y-%m-%d %H:%M:%S.%f")
 
     def ability_write(self):
         return [(i.type, i.val) for i in self.abilities]
@@ -95,9 +99,12 @@ class Ability:
 class UserList:
     def __init__(self, udict):
         try:
-            self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected']) for i in udict]
+            self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected'], i['thornmail']) for i in udict]
         except:
-            self.ulist = [User(i['user_id'], i["name"], i['nickname']) for i in udict]
+            try:
+                self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected']) for i in udict]
+            except:
+                self.ulist = [User(i['user_id'], i["name"], i['nickname']) for i in udict]
         self.ids = [i['user_id'] for i in udict]
         self.names = [i['name'] for i in udict]
         self.nicknames = [i['nickname'] for i in udict]
@@ -194,7 +201,7 @@ def auth_load():
     with open(os.path.abspath('auth.json'),'r') as auth:
         file = auth.readlines()
         data = json.loads(file[0])
-    auth.close()
+        auth.close()
     return data
 
 def users_load():
@@ -203,7 +210,7 @@ def users_load():
     with open(os.path.abspath('users2.json'),'r') as users:
         file = users.readlines()
         data = json.loads(file[0])
-    users.close()
+        users.close()
     return data
 
 def users_write(ulist):
@@ -211,7 +218,7 @@ def users_write(ulist):
     :param UserList ulist: user list of User objects"""
     with open(os.path.abspath('users2.json'),'w') as users:
         users.write(json.dumps([i.__dict__() for i in ulist.ulist]))
-    users.close()
+        users.close()
 
 def last_load():
     """Loads last message id read.
@@ -219,7 +226,7 @@ def last_load():
     with open(os.path.abspath('last.json'),'r') as last:
         file = last.readlines()
         data = json.loads(file[0])
-    last.close()
+        last.close()
     return data['last_read']
 
 def last_write(last_message):
@@ -228,14 +235,24 @@ def last_write(last_message):
     if int(last_message) > int(last_load()):
         with open(os.path.abspath('last.json'),'w') as l:
             l.write(json.dumps({'last_read':last_message}))
-        l.close()
+            l.close()
+
+def stat_write(stat):
+    with open(os.path.abspath('users2.json'),'a') as s:
+        s.write(str(stat) + '\n')
+        s.close()
 
 def update_everyone(request_params, group_id, ulist, auth):
     group = requests.get('https://api.groupme.com/v3/groups/' +group_id, params = request_params).json()['response']
     if group['id'] == auth['equipo']['group_id']:
         for member in group['members']:
             user = ulist.find(member['id'])
-            user.nickname = member['nickname']
+            if user.name == 'invalid':
+                ulist.add(User(member['user_id'], member['nickname'], member['nickname']))
+            else:
+                if user.thornmail and user.protect < datetime.now():
+                    user.thornmail = False
+                user.nickname = member['nickname']
 
 def members(request_params, group_id):
     group = requests.get('https://api.groupme.com/v3/groups/' + group_id, params = request_params).json()['response']
@@ -258,7 +275,7 @@ def remove_mention_text(message, ulist):
     return message_text
 
 #changes realness in dictionary, updates
-def adjust_realness(id, ulist, message, reason, post_params, multiplier=1):
+def adjust_realness(target_id, ulist, message, reason, post_params, multiplier=1):
     """Adds or subtracts realness from User. Calls add_realness() or
     subtract_realness() of User and find methods of UserList and send_message().
     Calls users_write().
@@ -267,9 +284,9 @@ def adjust_realness(id, ulist, message, reason, post_params, multiplier=1):
     :param Message message: message object that calls this function
     :param reason: type of adjust, add or subtract
     :return bool: True if success, False if failure"""
-    person = ulist.find(id)
+    person = ulist.find(target_id)
 
-    if id == message.sender_id:
+    if target_id == message.sender_id:
         post_params['text'] = 'You can\'t change your own realness.'
         send_message(post_params)
         return False
@@ -278,6 +295,11 @@ def adjust_realness(id, ulist, message, reason, post_params, multiplier=1):
         return True
     elif reason == 'subtract':
         if person.protected > datetime.now():
+            post_params['text'] = 'Sorry, ' + person.nickname + ' is protected.'
+            send_message(post_params)
+            return False
+        elif person.thornmail > datetime.now():
+            ulist.find(message.sender_id).realness -= 1
             post_params['text'] = 'Sorry, ' + person.nickname + ' is protected.'
             send_message(post_params)
             return False
@@ -583,21 +605,37 @@ def not_real(text, message, ulist, post_params):
 
 def shop(text, message, ulist, post_params):
     text = text[1].strip().split(' ')
-    if text[0] in ['protect']:
+    if text[0] in ['protect', 'thornmail']:
         person = ulist.find(message.sender_id)
         if (len(text) > 1 and text[1].isdigit()):
-            if person.realness > 10 * int(text[1]):
-                person.add_ability(Ability(text[0], int(text[1])))
-                person.realness -= 10 * int(text[1])
-
-                post_params['text'] = "Ok, 1 " +text[0]+ " ability. That'll last yah " + text[1] + ' hours.'
-                send_message(post_params)
+            if text[0] in ['protect']:
+                if person.realness > 10 * int(text[1]):
+                    person.add_ability(Ability(text[0], int(text[1])))
+                    person.realness -= 10 * int(text[1])
+    
+                    post_params['text'] = "Ok, 1 " +text[0]+ " ability. That'll last yah " + text[1] + ' hours.'
+                    send_message(post_params)
+                else:
+                    post_params['text'] = 'Fuck off peasant.'
+                    send_message(post_params)
+            elif text[0] in ['thornmail']:
+                if person.realness > 15 * int(text[1]):
+                    person.add_ability(Ability(text[0], int(text[1])))
+                    person.realness -= 15 * int(text[1])
+    
+                    post_params['text'] = "Ok, 1 " +text[0]+ " ability. That'll last yah " + text[1] + ' hours.'
+                    send_message(post_params)
+                else:
+                    post_params['text'] = 'Fuck off peasant.'
+                    send_message(post_params)
+                
             else:
-                post_params['text'] = 'Fuck off peasant.'
+                post_params['text'] = 'UH OH. Bad Fuckup'
                 send_message(post_params)
         else:
             post_params['text'] = 'I think you messed up how long you want this effect for?'
             send_message(post_params)
+            
     else:
         post_params['text'] = "I don't have that ability for sale... yet."
         send_message(post_params)
