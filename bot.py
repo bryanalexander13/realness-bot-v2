@@ -96,6 +96,7 @@ class Ability:
         self.type = typ
         self.val = val
 
+
 class UserList:
     def __init__(self, udict):
         try:
@@ -105,32 +106,38 @@ class UserList:
                 self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected']) for i in udict]
             except:
                 self.ulist = [User(i['user_id'], i["name"], i['nickname']) for i in udict]
-        self.ids = [i['user_id'] for i in udict]
-        self.names = [i['name'] for i in udict]
-        self.nicknames = [i['nickname'] for i in udict]
-        self.realness = [i['user_id'] for i in udict]
+        self.ids = {i.user_id:i for i in self.ulist}
+        self.names = {i.name:i for i in self.ulist}
+        self.nicknames = {i.nickname:i for i in self.ulist}
+        self.realnesses = {i.realness:i for i in self.ulist}
 
     def find(self, user_id):
         try:
-            return [i for i in self.ulist if i.user_id == user_id][0]
+            return self.ids[user_id]
         except:
             return User("0", "invalid", "invalid")
 
     def findByName(self, name):
         try:
-            return [i for i in self.ulist if i.name == name][0]
+            return self.names[name]
         except:
             return User("0", "invalid", "invalid")
 
     def findByNickname(self, nickname):
         try:
-            return [i for i in self.ulist if i.nickname == nickname][0]
+            return self.nicknames[nickname]
+        except:
+            return User("0", "invalid", "invalid")
+    
+    def findByRealness(self, realness):
+        try:
+            return self.realnesses[realness]
         except:
             return User("0", "invalid", "invalid")
 
     def add(self, user):
         self.ulist += user
-        self.ids += user.user_id
+        self.ids[user.user_id] = user
 
     def remove(self, user_id):
         user = self.find(user_id)
@@ -321,16 +328,16 @@ def text_change_realness(names, ulist, message, reason, post_params):
     dmultiplier = 1
     for i, name in enumerate(names):
         try:
-            if (int(name) < 1 and i != 0 and name not in ulist.ids):
+            if (int(name) < 1 and i != 0 and ulist.find(name).name == 'invalid'):
                 del names[i-1]
                 names.remove(name)
                 post_params['text']= 'That doesn\'t make sense'
                 send_message(post_params)
         except:
             continue
-    multiplier_bool = [bool(name.isdigit() and name not in ulist.ids) for name in names]
+    multiplier_bool = [bool(name.isdigit() and ulist.find(name).name == 'invalid') for name in names]
     for i,name in enumerate(names):
-        if (name.isdigit() and len(name)==8 and name in ulist.ids):
+        if (name.isdigit() and len(name)==8 and ulist.find(name).name != 'invalid'):
             try:
                 if multiplier_bool[i+1]:
                     realness_list.append((name,int(names[i+1])))
@@ -338,7 +345,7 @@ def text_change_realness(names, ulist, message, reason, post_params):
                     realness_list.append((name,dmultiplier))
             except IndexError:
                 realness_list.append((name,dmultiplier))
-        elif (name.isdigit() and name not in ulist.ids):
+        elif (name.isdigit() and ulist.find(name).name == 'invalid'):
             continue
         else:
             try:
@@ -382,7 +389,12 @@ def read_messages(request_params, group_id, ulist, post_params, auth, timer):
     :param str group_id: group id
     :param UserList ulist: user list of User objects
     :return list: list of Message objects"""
-    response_messages = requests.get('https://api.groupme.com/v3/groups/{}/messages'.format(group_id), params = request_params).json()['response']['messages']
+    try:
+        response_messages = requests.get('https://api.groupme.com/v3/groups/{}/messages'.format(group_id), params = request_params).json()['response']['messages']
+    except:
+        print('connection problem')
+        time.sleep(10)
+        return
     message_list=[]
     last = last_load()
 
@@ -757,7 +769,7 @@ def startup():
     user_dict = users_load()
     userlist = UserList(user_dict)
     auth = auth_load()
-    bot = auth['equipo']
+    bot = auth['test']
     group_id = bot['group_id']
     request_params = {'token':auth['token']}
     post_params = {'text':'','bot_id':bot['bot_id'],'attachments':[]}
