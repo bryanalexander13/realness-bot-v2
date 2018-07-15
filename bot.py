@@ -152,7 +152,7 @@ class UserList:
             return User("0", "invalid", "invalid")
 
     def add(self, user):
-        self.ulist += user
+        self.ulist += [user]
         self.ids[user.user_id] = user
         self.names[user.name] = user
         self.nicknames[user.nickname] = user
@@ -354,12 +354,10 @@ def update_everyone(request_params, group_id, ulist, auth):
     group = requests.get('https://api.groupme.com/v3/groups/' +group_id, params = request_params).json()['response']
     if group['id'] == auth['equipo']['group_id']:
         for member in group['members']:
-            user = ulist.find(member['id'])
+            user = ulist.find(member['user_id'])
             if user.name == 'invalid':
                 ulist.add(User(member['user_id'], member['nickname'], member['nickname']))
             else:
-                if user.thornmail and user.protect < datetime.now():
-                    user.thornmail = False
                 user.nickname = member['nickname']
 
 def members(request_params, group_id):
@@ -811,7 +809,7 @@ def startup():
     user_dict = users_load()
     userlist = UserList(user_dict)
     auth = auth_load()
-    bot = auth['test']
+    bot = auth['equipo']
     group_id = bot['group_id']
     request_params = {'token':auth['token']}
     post_params = {'text':'','bot_id':bot['bot_id'],'attachments':[]}
