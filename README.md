@@ -8,5 +8,4 @@
 
 
 # Additions:
-#### -bomb ability
 #### -weekly statistics

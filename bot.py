@@ -15,7 +15,9 @@ class User:
         self.abilities = abilities
         self.protected = self.datetime_read(protected)
         self.thornmail = self.datetime_read(thornmail)
-        self.switch = {"protect" : "self.protect(ability.val)", "thornmail" : "self.thornmailed(ability.val)"}
+        self.switch = {"protect" : "self.protect(ability.val)", 
+                       "thornmail" : "self.thornmailed(ability.val)",
+                       "bomb" : "self.bomb(person, ulist, message, ability.val, post_params)"}
         self.ability_read()
         self.properties = self.__dict__().keys()
 
@@ -43,13 +45,24 @@ class User:
     def changeNickname(self, nickname):
         self.nickname = nickname
 
-    def use_ability(self, rest, post_params):
+    def use_ability(self, rest, ulist, message, post_params):
         if len(rest) == 2 and rest[1].isdigit():
             for ability in self.abilities:
                 if (rest[0] == ability.type and int(rest[1]) == ability.val):
                     self.remove_ability(ability)
                     exec(self.switch[ability.type])
-                    post_params['text'] = "Upgrade used"
+                    post_params['text'] = "Ability used"
+                    send_message(post_params)
+                    return
+            post_params['text'] = "You don't have that ability"
+            send_message(post_params)
+        elif len(rest) >= 3 and rest[1].isdigit() and message.attachments != []:
+            for ability in self.abilities:
+                if (rest[0] == ability.type and int(rest[1]) == ability.val):
+                    self.remove_ability(ability)
+                    person = message.attachments[0]['user_ids'][0]
+                    exec(self.switch[ability.type])
+                    post_params['text'] = "Ability used"
                     send_message(post_params)
                     return
             post_params['text'] = "You don't have that ability"
@@ -63,6 +76,9 @@ class User:
         
     def thornmailed(self, time):
         self.thornmail = datetime.now() + timedelta(hours = time)
+    
+    def bomb(self, person, ulist, message, power, post_params):
+        adjust_realness(person, ulist, message, "subtract", post_params, multiplier=10*power)
         
     def datetime_write(self, date):
         return date.strftime("%Y-%m-%d %H:%M:%S.%f")
@@ -642,21 +658,21 @@ def not_real(text, message, ulist, post_params):
 
 def shop(text, message, ulist, post_params):
     text = text[1].strip().split(' ')
-    if text[0] in ['protect', 'thornmail']:
+    if text[0] in ['protect', 'thornmail', 'bomb']:
         person = ulist.find(message.sender_id)
         if (len(text) > 1 and text[1].isdigit()):
-            if text[0] in ['protect']:
-                if person.realness > 10 * int(text[1]):
+            if text[0] in ['protect', 'bomb']:
+                if person.realness >= 10 * int(text[1]):
                     person.add_ability(Ability(text[0], int(text[1])))
                     person.realness -= 10 * int(text[1])
     
-                    post_params['text'] = "Ok, 1 " +text[0]+ " ability. That'll last yah " + text[1] + ' hours.'
+                    post_params['text'] = "Ok, 1 " +text[0]+ " ability."
                     send_message(post_params)
                 else:
                     post_params['text'] = 'Fuck off peasant.'
                     send_message(post_params)
             elif text[0] in ['thornmail']:
-                if person.realness > 15 * int(text[1]):
+                if person.realness >= 15 * int(text[1]):
                     person.add_ability(Ability(text[0], int(text[1])))
                     person.realness -= 15 * int(text[1])
     
@@ -733,7 +749,7 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id):
 
             elif (text.lower().startswith('use')):
                 rest = text.split('use')[1].strip().split(' ')
-                ulist.find(message.sender_id).use_ability(rest, post_params)
+                ulist.find(message.sender_id).use_ability(rest, ulist, message, post_params)
 
             elif (text.startswith('play')):
                 t = text.split(' ')
