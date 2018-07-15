@@ -1,7 +1,4 @@
 # Fixes:
-#### - mentions
-#### - the way multiple realness adjustments update the user files (should be done all at once) Patched?
-
 
 # Improvements:
 #### -users and userlist dicts to speed up lookup
@@ -14,6 +11,5 @@
 
 # Additions:
 #### -bomb ability
-#### -remind me timer
 #### -protection with retribution
 #### -weekly statistics

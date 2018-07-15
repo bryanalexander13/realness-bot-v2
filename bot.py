@@ -338,7 +338,7 @@ def text_change_realness(names, ulist, message, reason, post_params):
     for actual_id in [id_tuple for id_tuple in realness_list if (id_tuple[0] != '0')]:
         if adjust_realness(actual_id[0], ulist, message, reason, post_params) == False:
             continue
-        elif int(id_tuple[1])-1 == 0:
+        elif int(actual_id[1])-1 == 0:
             text += ulist.find(actual_id[0]).name.capitalize() + ' '+ str(actual_id[1]) + '. '
         else:
             adjust_realness(actual_id[0], ulist, message, reason, post_params, actual_id[1]-1)
@@ -394,12 +394,12 @@ def read_messages(request_params, group_id, ulist, post_params, auth, timer):
 
     return message_list
 
-def start_timer(rest, user_id, message, timer):
+def start_timer(val, rest, user_id, message, timer):
     """Creates timer list of tuples.
     :param str rest: number of minutes
     :param str user_id: user id to start timer for
     :param Message message: message calling this function"""
-    timer += [(True, datetime.now() + (timedelta(minutes=int(rest[0]))), user_id, message)]
+    timer += [(val, datetime.now() + (timedelta(minutes=int(rest[0]))), [user_id], message)]
     timer = sorted(timer, key = lambda x:x[1])
 
 
@@ -412,16 +412,22 @@ def set_timer(text, message, post_params, timer):
         name = message.attachments[0]['loci'][0]
         rest = text[name[0] + name[1]-3:].strip().split(" ")
         if (len(rest) == 1 and rest[0].isdigit()):
-            start_timer(rest, message.attachments[0]['user_ids'][0], message, timer)
+            start_timer(True, rest, message.attachments[0]['user_ids'][0], message, timer)
             post_params['text'] = 'Timer set for ' + rest[0] + ' minutes'
             send_message(post_params)
         else:
             post_params['text'] = "I don't know when that is: '" + str(text[name[0] + name[1]-3:]) + "'"
             send_message(post_params)
-    else:
-        post_params['text'] = "I don't know who that is"
+    elif (len(text.split(' ')) == 2 and text.split(' ')[1].isdigit()):
+        start_timer(False, text.split(' ')[1], message.user_id, message, timer)
+        post_params['text'] = 'Timer set for ' + text.split(' ')[1] + ' minutes'
         send_message(post_params)
-
+    else:
+        post_params['text'] = ("I don't know when or who that is.\n" +
+                               "Ex. @rb timer @Employed Degenerate 10 or\n" +
+                               "@rb timer 10")
+        send_message(post_params)
+            
 def cancel_timer(user_id, post_params, timer):
     """Cancels timer.
     :param str user_id: user id"""
@@ -433,6 +439,20 @@ def cancel_timer(user_id, post_params, timer):
     if t:
         post_params['text'] = "Finally"
         send_message(post_params)
+
+def check_timer(ulist, post_params, timer):
+    if (len(timer) > 0 and timer[0][1] < datetime.now()):
+            if timer[0][0]:
+                post_params['text'] = "Hey Retard. You're Late."
+                send_message(post_params)
+                text_change_realness([timer[0][2]], ulist, timer[0][3], 'subtract')
+                del timer[0]
+            else:
+                name = ulist.find(timer[0][2][0]).nickname
+                post_params['text'] = "@" + name + " Your Timer Is Up!"
+                post_params['attachments'] = [{'loci': [[0,len(name)]], 'type':'mentions', 'user_ids':timer[0][2]}]
+                send_message(post_params)
+                del timer[0]
 
 
 def helper_main(post_params):
@@ -612,9 +632,6 @@ def commands(message, ulist, post_params, timer, request_params, group_id):
     elif (message.text.lower().startswith('@rb ')):
             text = message.text.split('@rb ')
 
-#            if (len(text[1].split(' ')) == 1):
-#                helper_main(post_params)
-#                return
             text = text[1].lower().strip()
 
             if text.startswith('very real'):
@@ -694,14 +711,7 @@ def run(request_params, post_params, timer, group_id, userlist, auth):
     while (1 == True):
         message_list = read_messages(request_params, group_id, userlist, post_params, auth, timer)
 
-        if (len(timer) > 0 and timer[0][0] and timer[0][1] < datetime.now()):
-            post_params['text'] = "Hey Retard. You're Late."
-            send_message(post_params)
-
-#            for val in [timer[0][2] for i in range(49)]:
-#                adjust_realness(val, userlist, timer[0][3], 'subtract')
-            text_change_realness([timer[0][2]], userlist, timer[0][3], 'subtract')
-            del timer[0]
+        check_timer(userlist, post_params, timer)
 
         time.sleep(1)
 
@@ -709,7 +719,7 @@ def startup():
     user_dict = users_load()
     userlist = UserList(user_dict)
     auth = auth_load()
-    bot = auth['equipo']
+    bot = auth['test']
     group_id = bot['group_id']
     request_params = {'token':auth['token']}
     post_params = {'text':'','bot_id':bot['bot_id'],'attachments':[]}
