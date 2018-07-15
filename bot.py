@@ -138,6 +138,9 @@ class UserList:
     def add(self, user):
         self.ulist += user
         self.ids[user.user_id] = user
+        self.names[user.name] = user
+        self.nicknames[user.nickname] = user
+        self.realnesses[user.realness] = user
 
     def remove(self, user_id):
         user = self.find(user_id)
@@ -162,6 +165,88 @@ class UserList:
             user.nickname = message.name
             return True
 
+
+class Timer:
+    
+    def __init__(self, punishment, time, user):
+        self.punishment = punishment
+        self.time = time
+        self.person = user
+        
+    def explode(self, post_params):
+        if self.punishment:
+            self.person.subtract_realness()
+            post_params['text'] = "Hey Retard. You're late"
+            post_params['attachments'] = [{'loci': [[4,6]], 'type':'mentions', 'user_ids':[self.person.user_id]}]
+            send_message(post_params)
+            post_params['attachments'] = []
+        else:
+            post_params['text'] = "@" + self.person.nickname + " You're Timer Is Up!"
+            post_params['attachments'] = [{'loci': [[0,len(self.person.nickname)]], 'type':'mentions', 'user_ids':[self.person.user_id]}]
+            send_message(post_params)
+            post_params['attachments'] = []
+            
+
+class TimerList:
+    
+    def __init__(self, timers = []):
+        self.timerlist = timers
+        self.timerdict = {i.time:i for i in timers}
+        self.iddict = {i.person.user_id:i for i in timers}
+    
+    def add(self, timer):
+        self.timerlist += [timer]
+        self.timerdict[timer.time] = timer
+        self.iddict[timer.person.user_id] = timer
+        
+    def remove(self, timer):
+        try:
+            del self.timerdict[timer.time]
+            del self.iddict[timer.person.user_id]
+            self.timerlist.remove(timer)
+            return True
+        except:
+            return False
+    
+    def upnext(self):
+        try:
+            return self.timerdict[min(self.timerdict)]
+        except:
+            return Timer(False, datetime.now() + timedelta(days= 1), "Invalid")
+    
+    def check(self, post_params):
+        timer = self.upnext()
+        if timer.time <= datetime.now():
+            timer.explode(post_params)
+            self.remove(timer)       
+    
+    def cancel_timer(self, user_id, post_params):
+        if self.remove(user_id):
+            post_params['text'] = "Finally"
+            send_message(post_params)
+    
+    def set_timer(self, text, message, ulist, post_params):
+        if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
+            name = message.attachments[0]['loci'][0]
+            rest = text[name[0] + name[1]-3:].strip().split(" ")
+            if (len(rest) == 1 and rest[0].isdigit()):
+                self.add(Timer(True, datetime.now() + (timedelta(minutes=int(rest[0]))), ulist.find(message.attachments[0]['user_ids'][0])))
+                post_params['text'] = 'Timer set for ' + rest[0] + ' minutes'
+                send_message(post_params)
+            else:
+                post_params['text'] = "I don't know when that is: '" + str(text[name[0] + name[1]-3:]) + "'"
+                send_message(post_params)
+        elif (len(text.split(' ')) == 2 and text.split(' ')[1].isdigit()):
+            self.add(Timer(False, datetime.now() + (timedelta(minutes=int(text.split(' ')[1]))), ulist.find(message.sender_id)))
+            post_params['text'] = 'Timer set for ' + text.split(' ')[1] + ' minutes'
+            send_message(post_params)
+        else:
+            post_params['text'] = ("I don't know when or who that is.\n" +
+                                   "Ex. @rb timer @Employed Degenerate 10 or\n" +
+                                   "@rb timer 10")
+            send_message(post_params)
+            
+        
 
 class Message:
     """A message handler"""
@@ -380,7 +465,7 @@ def text_change_realness(names, ulist, message, reason, post_params):
         send_message(post_params)
 
 #reads messages and creates message_list of Message objects
-def read_messages(request_params, group_id, ulist, post_params, auth, timer):
+def read_messages(request_params, group_id, ulist, post_params, auth, timerlist):
     """Reads in messages from GroupMe API through requests.get().
     Converts messages into Message objects. Filters system and bot messages.
     Updates ulist with update method of UserList.  Calls commands().  Calls
@@ -419,7 +504,7 @@ def read_messages(request_params, group_id, ulist, post_params, auth, timer):
         if mess.sender_type == 'bot' or mess.sender_type == 'system':
             continue
         else:
-            commands(mess, ulist, post_params, timer, request_params, group_id)
+            commands(mess, ulist, post_params, timerlist, request_params, group_id)
             update_everyone(request_params, group_id, ulist, auth)
             users_write(ulist)
 
@@ -427,66 +512,6 @@ def read_messages(request_params, group_id, ulist, post_params, auth, timer):
         last_write(message_list[0].id)
 
     return message_list
-
-def start_timer(val, rest, user_id, message, timer):
-    """Creates timer list of tuples.
-    :param str rest: number of minutes
-    :param str user_id: user id to start timer for
-    :param Message message: message calling this function"""
-    timer += [(val, datetime.now() + (timedelta(minutes=int(rest[0]))), [user_id], message)]
-    timer = sorted(timer, key = lambda x:x[1])
-
-
-def set_timer(text, message, post_params, timer):
-    """Parses text and calls start_timer() to creat timer.  Sends message with
-    send_message() to alert the person being timed.
-    :param str text: text split from @rb command ##probably needs be updated
-    :param Message message: message calling this function"""
-    if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
-        name = message.attachments[0]['loci'][0]
-        rest = text[name[0] + name[1]-3:].strip().split(" ")
-        if (len(rest) == 1 and rest[0].isdigit()):
-            start_timer(True, rest, message.attachments[0]['user_ids'][0], message, timer)
-            post_params['text'] = 'Timer set for ' + rest[0] + ' minutes'
-            send_message(post_params)
-        else:
-            post_params['text'] = "I don't know when that is: '" + str(text[name[0] + name[1]-3:]) + "'"
-            send_message(post_params)
-    elif (len(text.split(' ')) == 2 and text.split(' ')[1].isdigit()):
-        start_timer(False, text.split(' ')[1], message.user_id, message, timer)
-        post_params['text'] = 'Timer set for ' + text.split(' ')[1] + ' minutes'
-        send_message(post_params)
-    else:
-        post_params['text'] = ("I don't know when or who that is.\n" +
-                               "Ex. @rb timer @Employed Degenerate 10 or\n" +
-                               "@rb timer 10")
-        send_message(post_params)
-            
-def cancel_timer(user_id, post_params, timer):
-    """Cancels timer.
-    :param str user_id: user id"""
-    t = False
-    for k, u_id in enumerate([j[2] for j in timer]):
-        if user_id == u_id:
-            del timer[k]
-            t = True
-    if t:
-        post_params['text'] = "Finally"
-        send_message(post_params)
-
-def check_timer(ulist, post_params, timer):
-    if (len(timer) > 0 and timer[0][1] < datetime.now()):
-            if timer[0][0]:
-                post_params['text'] = "Hey Retard. You're Late."
-                send_message(post_params)
-                text_change_realness([timer[0][2]], ulist, timer[0][3], 'subtract')
-                del timer[0]
-            else:
-                name = ulist.find(timer[0][2][0]).nickname
-                post_params['text'] = "@" + name + " Your Timer Is Up!"
-                post_params['attachments'] = [{'loci': [[0,len(name)]], 'type':'mentions', 'user_ids':timer[0][2]}]
-                send_message(post_params)
-                del timer[0]
 
 
 def helper_main(post_params):
@@ -663,6 +688,7 @@ def call_all(message, ulist, post_params, request_params, group_id):
     post_params['attachments'] = [{'loci': loci, 'type':'mentions', 'user_ids':user_ids}]#[{'loci': [[0, 1], [2,1], [4,1], [6,1], [8,1], [10,1]], 'type':'mentions', 'user_ids': ulist.nicknames}]
     post_params['text'] = "@everyone " + message.text.split('@all')[1].strip()
     send_message(post_params)
+    post_params['attachments'] = []
 
 
 def play(user_id, user_name, user2_id = '', user2_name = '', print_type = 'phone'):
@@ -670,11 +696,11 @@ def play(user_id, user_name, user2_id = '', user2_name = '', print_type = 'phone
 
 
 #checks for last message and runs commands
-def commands(message, ulist, post_params, timer, request_params, group_id):
+def commands(message, ulist, post_params, timerlist, request_params, group_id):
     if message.text == None:
         return
     elif message.text.lower().startswith('here'):
-        cancel_timer(message.user_id)
+        timerlist.cancel_timer(message.user_id, post_params)
     elif (message.text.lower().startswith("@all") or message.text.lower().startswith("@everyone")):
         call_all(message, ulist, post_params, request_params, group_id)
     elif (message.text.lower().strip() == '@rb'):
@@ -694,13 +720,13 @@ def commands(message, ulist, post_params, timer, request_params, group_id):
                 ulist.ranking(post_params)
 
             elif text.startswith('timer'):
-                set_timer(text, message, post_params, timer)
+                timerlist.set_timer(text, message, ulist, post_params)
 
             elif (text.startswith("help")):
                 helper_specific(post_params, text)
 
             elif (text.startswith('here')):
-                cancel_timer(message.user_id, post_params, timer)
+                timerlist.cancel_timer(message.user_id, post_params)
 
             elif (text.lower().startswith('shop')):
                 shop((text.split('shop')), message, ulist, post_params)
@@ -757,11 +783,11 @@ def commands(message, ulist, post_params, timer, request_params, group_id):
                 helper_main(post_params)
 
 
-def run(request_params, post_params, timer, group_id, userlist, auth):
+def run(request_params, post_params, timerlist, group_id, userlist, auth):
     while (1 == True):
-        message_list = read_messages(request_params, group_id, userlist, post_params, auth, timer)
+        message_list = read_messages(request_params, group_id, userlist, post_params, auth, timerlist)
 
-        check_timer(userlist, post_params, timer)
+        timerlist.check(post_params)
 
         time.sleep(1)
 
@@ -773,12 +799,12 @@ def startup():
     group_id = bot['group_id']
     request_params = {'token':auth['token']}
     post_params = {'text':'','bot_id':bot['bot_id'],'attachments':[]}
-    timer = []
+    timerlist = TimerList()
     text = 'The current realness levels are: \n'
     for user in sorted(userlist.ulist, key=lambda x: x.realness):
         text += user.nickname +': ' + str(user.realness) + '\n'
     print(text)
-    run(request_params, post_params, timer, group_id, userlist, auth)
+    run(request_params, post_params, timerlist, group_id, userlist, auth)
 
 
 if __name__ == "__main__":
