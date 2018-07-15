@@ -348,7 +348,7 @@ def text_change_realness(names, ulist, message, reason, post_params):
                     realness_list.append((ulist.findByName(name).user_id,dmultiplier))
             except:
                 realness_list.append((ulist.findByName(name).user_id,dmultiplier))
-    if [x[0] for x in realness_list].count('0') > 1:
+    if [x[0] for x in realness_list].count('0') >= 1:
         post_params['text'] = 'Invalid IDs'
         send_message(post_params)
         return
@@ -757,7 +757,7 @@ def startup():
     user_dict = users_load()
     userlist = UserList(user_dict)
     auth = auth_load()
-    bot = auth['test']
+    bot = auth['equipo']
     group_id = bot['group_id']
     request_params = {'token':auth['token']}
     post_params = {'text':'','bot_id':bot['bot_id'],'attachments':[]}

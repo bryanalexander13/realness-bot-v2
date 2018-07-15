@@ -11,5 +11,4 @@
 
 # Additions:
 #### -bomb ability
-#### -protection with retribution
 #### -weekly statistics
