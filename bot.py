@@ -435,7 +435,7 @@ def text_change_realness(name_list, ulist, message, reason, post_params):
             continue
     name_list = [ulist.findByName(strang).user_id if strang.isalpha() else strang for strang in name_list]
     if name_list.count('0') > 1:
-        post_parms['text'] = 'Invalid IDs'
+        post_params['text'] = 'Invalid IDs'
         send_message(post_params)
         return
     multiplier_bool = [bool(name.isdigit() and name not in ulist.ids) for name in name_list]
