@@ -15,7 +15,7 @@ class User:
         self.abilities = abilities
         self.protected = self.datetime_read(protected)
         self.thornmail = self.datetime_read(thornmail)
-        self.switch = {"protect" : "self.protect(ability.val)", 
+        self.switch = {"protect" : "self.protect(ability.val)",
                        "thornmail" : "self.thornmailed(ability.val)",
                        "bomb" : "self.bomb(person, ulist, message, ability.val, post_params)"}
         self.ability_read()
@@ -73,13 +73,13 @@ class User:
 
     def protect(self, time):
         self.protected = datetime.now() + timedelta(hours = time)
-        
+
     def thornmailed(self, time):
         self.thornmail = datetime.now() + timedelta(hours = time)
-    
+
     def bomb(self, person, ulist, message, power, post_params):
         adjust_realness(person, ulist, message, "subtract", post_params, multiplier=10*power)
-        
+
     def datetime_write(self, date):
         return date.strftime("%Y-%m-%d %H:%M:%S.%f")
 
@@ -144,7 +144,7 @@ class UserList:
             return self.nicknames[nickname]
         except:
             return User("0", "invalid", "invalid")
-    
+
     def findByRealness(self, realness):
         try:
             return self.realnesses[realness]
@@ -183,12 +183,12 @@ class UserList:
 
 
 class Timer:
-    
+
     def __init__(self, punishment, time, user):
         self.punishment = punishment
         self.time = time
         self.person = user
-        
+
     def explode(self, post_params):
         if self.punishment:
             self.person.subtract_realness()
@@ -201,20 +201,20 @@ class Timer:
             post_params['attachments'] = [{'loci': [[0,len(self.person.nickname)]], 'type':'mentions', 'user_ids':[self.person.user_id]}]
             send_message(post_params)
             post_params['attachments'] = []
-            
+
 
 class TimerList:
-    
+
     def __init__(self, timers = []):
         self.timerlist = timers
         self.timerdict = {i.time:i for i in timers}
         self.iddict = {i.person.user_id:i for i in timers}
-    
+
     def add(self, timer):
         self.timerlist += [timer]
         self.timerdict[timer.time] = timer
         self.iddict[timer.person.user_id] = timer
-        
+
     def remove(self, timer):
         try:
             del self.timerdict[timer.time]
@@ -223,24 +223,24 @@ class TimerList:
             return True
         except:
             return False
-    
+
     def upnext(self):
         try:
             return self.timerdict[min(self.timerdict)]
         except:
             return Timer(False, datetime.now() + timedelta(days= 1), "Invalid")
-    
+
     def check(self, post_params):
         timer = self.upnext()
         if timer.time <= datetime.now():
             timer.explode(post_params)
-            self.remove(timer)       
-    
+            self.remove(timer)
+
     def cancel_timer(self, user_id, post_params):
         if self.remove(user_id):
             post_params['text'] = "Finally"
             send_message(post_params)
-    
+
     def set_timer(self, text, message, ulist, post_params):
         if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
             name = message.attachments[0]['loci'][0]
@@ -261,8 +261,8 @@ class TimerList:
                                    "Ex. @rb timer @Employed Degenerate 10 or\n" +
                                    "@rb timer 10")
             send_message(post_params)
-            
-        
+
+
 
 class Message:
     """A message handler"""
@@ -415,65 +415,52 @@ def adjust_realness(target_id, ulist, message, reason, post_params, multiplier=1
     users_write(ulist)
     return True
 
-def text_change_realness(names, ulist, message, reason, post_params):
+def text_change_realness(name_list, ulist, message, reason, post_params):
     """Adds or Subtracts realness with multiple values. Posts messages with
     realness updates.  Calls send_message() and adjust_realness(). Uses findByName
     method of UserList.
-    :param list names: ids with multiplier value following the id
+    :param list name_list: ids with multiplier value following the id
     :param UserList ulist: user list of User objects
     :param Message message: message object that calls this function
     :param reason: type of adjust, add or subtract"""
-    realness_list = []
     dmultiplier = 1
-    for i, name in enumerate(names):
+    for i, name in enumerate(name_list):
         try:
-            if (int(name) < 1 and i != 0 and ulist.find(name).name == 'invalid'):
-                del names[i-1]
+            if (int(name_list) < 1 and i != 0 and name_list not in ulist.ids):
+                del names_list[i-1]
                 names.remove(name)
                 post_params['text']= 'That doesn\'t make sense'
                 send_message(post_params)
         except:
             continue
-    multiplier_bool = [bool(name.isdigit() and ulist.find(name).name == 'invalid') for name in names]
-    for i,name in enumerate(names):
-        if (name.isdigit() and len(name)==8 and ulist.find(name).name != 'invalid'):
+    name_list = [ulist.findByName(strang).user_id if strang.isalpha() else strang for strang in name_list]
+    if name_list.count('0') > 1:
+        post_parms['text'] = 'Invalid IDs'
+        send_message(post_params)
+        return
+    multiplier_bool = [bool(name.isdigit() and name not in ulist.ids) for name in name_list]
+    realness_list=[]
+    for i, name in enumerate(name_list):
+        if (name in ulist.ids):
             try:
                 if multiplier_bool[i+1]:
-                    realness_list.append((name,int(names[i+1])))
+                    realness_list.append((name,int(name_list[i+1])))
                 else:
                     realness_list.append((name,dmultiplier))
-            except IndexError:
-                realness_list.append((name,dmultiplier))
-        elif (name.isdigit() and ulist.find(name).name == 'invalid'):
-            continue
-        else:
-            try:
-                if multiplier_bool[i+1]:
-                    realness_list.append((ulist.findByName(name).user_id,int(names[i+1])))
-                else:
-                    realness_list.append((ulist.findByName(name).user_id,dmultiplier))
             except:
-                realness_list.append((ulist.findByName(name).user_id,dmultiplier))
-    if [x[0] for x in realness_list].count('0') >= 1:
-        post_params['text'] = 'Invalid IDs'
-        send_message(post_params)
+                realness_list.append((name,dmultiplier))
+    if len(realness_list) == 0:
         return
     text = str()
     if reason == 'add':
         text = 'Real '
     elif reason == 'subtract':
         text = 'Not Real '
-    for actual_id in [id_tuple for id_tuple in realness_list if (id_tuple[0] != '0')]:
-        if adjust_realness(actual_id[0], ulist, message, reason, post_params) == False:
-            continue
-        elif int(actual_id[1])-1 == 0:
+    for actual_id in realness_list:
+        if adjust_realness(actual_id[0], ulist, message, reason, post_params, actual_id[1]):
             text += ulist.find(actual_id[0]).name.capitalize() + ' '+ str(actual_id[1]) + '. '
-        else:
-            adjust_realness(actual_id[0], ulist, message, reason, post_params, actual_id[1]-1)
-            text += ulist.find(actual_id[0]).name.capitalize() + ' '+ str(actual_id[1]) + '. '
-    if text != 'Real ' and text != 'Not Real ':
-        post_params['text'] = text
-        send_message(post_params)
+    post_params['text'] = text
+    send_message(post_params)
     if (reason == 'subtract' and ulist.findByName("carter").user_id in realness_list):
         post_params['text'] = 'It is terminal.'
         send_message(post_params)
@@ -663,7 +650,7 @@ def shop(text, message, ulist, post_params):
                 if person.realness >= 10 * int(text[1]):
                     person.add_ability(Ability(text[0], int(text[1])))
                     person.realness -= 10 * int(text[1])
-    
+
                     post_params['text'] = "Ok, 1 " +text[0]+ " ability."
                     send_message(post_params)
                 else:
@@ -673,20 +660,20 @@ def shop(text, message, ulist, post_params):
                 if person.realness >= 15 * int(text[1]):
                     person.add_ability(Ability(text[0], int(text[1])))
                     person.realness -= 15 * int(text[1])
-    
+
                     post_params['text'] = "Ok, 1 " +text[0]+ " ability. That'll last yah " + text[1] + ' hours.'
                     send_message(post_params)
                 else:
                     post_params['text'] = 'Fuck off peasant.'
                     send_message(post_params)
-                
+
             else:
                 post_params['text'] = 'UH OH. Bad Fuckup'
                 send_message(post_params)
         else:
             post_params['text'] = 'I think you messed up how long you want this effect for?'
             send_message(post_params)
-            
+
     else:
         post_params['text'] = "I don't have that ability for sale... yet."
         send_message(post_params)
