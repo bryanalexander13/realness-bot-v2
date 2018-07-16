@@ -699,8 +699,6 @@ def play(ulist, user_id, user_name, user2_id = '', user2_name = '', print_type =
     elif outcome == "win2":
         ulist.find(user2_id).add_realness(5)
         ulist.find(user_id).subtract_realness(5)
-    elif outcome == "lose":
-        ulist.find(user_id).subtract_realness(5)
 
         
 #checks for last message and runs commands
