@@ -689,10 +689,20 @@ def call_all(message, ulist, post_params, request_params, group_id):
     post_params['attachments'] = []
 
 
-def play(user_id, user_name, user2_id = '', user2_name = '', print_type = 'phone'):
-    play4.play_connect4(user_id, user_name, user2_id, user2_name, print_type)
+def play(ulist, user_id, user_name, user2_id = '', user2_name = '', print_type = 'phone'):
+    outcome = play4.play_connect4(user_id, user_name, user2_id, user2_name, print_type)
+    if outcome == "win0":
+        ulist.find(user_id).add_realness(5)
+    elif outcome == "win1":
+        ulist.find(user_id).add_realness(5)
+        ulist.find(user2_id).subtract_realness(5)
+    elif outcome == "win2":
+        ulist.find(user2_id).add_realness(5)
+        ulist.find(user_id).subtract_realness(5)
+    elif outcome == "lose":
+        ulist.find(user_id).subtract_realness(5)
 
-
+        
 #checks for last message and runs commands
 def commands(message, ulist, post_params, timerlist, request_params, group_id):
     if message.text == None:
@@ -737,24 +747,24 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id):
                 t = text.split(' ')
                 if len(t) == 1 or len(t) == 2:
                     if text.endswith('both'):
-                        play(message.sender_id, message.name, '', '', 'both')
+                        play(ulist, message.sender_id, message.name, '', '', 'both')
                     elif text.endswith('computer'):
-                        play(message.sender_id, message.name, '', '', 'computer')
+                        play(ulist, message.sender_id, message.name, '', '', 'computer')
                     else:
-                        play(message.sender_id, message.name, '', '', 'phone')
+                        play(ulist, message.sender_id, message.name, '', '', 'phone')
                     return
                 elif (message.attachments[0] != [] and message.attachments[0]['type'] == 'mentions'):
                     person = message.attachments[0]['user_ids']
                     if len(person) == 1:
                         if text.endswith('both'):
                             name = ulist.find(person[0]).nickname
-                            play(message.sender_id, message.name, person[0], name, 'both')
+                            play(ulist, message.sender_id, message.name, person[0], name, 'both')
                         elif text.endswith('computer'):
                             name = ulist.find(person[0]).nickname
-                            play(message.sender_id, message.name, person[0], name, 'computer')
+                            play(ulist, message.sender_id, message.name, person[0], name, 'computer')
                         else:
                             name = ulist.find(person[0]).nickname
-                            play(message.sender_id, message.name, person[0], name, 'phone')
+                            play(ulist, message.sender_id, message.name, person[0], name, 'phone')
                     else:
                         helper_main(post_params)
                 else:
@@ -793,7 +803,7 @@ def startup():
     user_dict = users_load()
     userlist = UserList(user_dict)
     auth = auth_load()
-    bot = auth['test']
+    bot = auth['equipo']
     group_id = bot['group_id']
     request_params = {'token':auth['token']}
     post_params = {'text':'','bot_id':bot['bot_id'],'attachments':[]}

@@ -29,9 +29,9 @@ def send_message(post_params):
 
 def play_connect4(user_id, user_name, user2_id, user2_name, print_type):
     if user2_id == '':
-        connect_four(Player('x'), aiplayer4.AIPlayer('o', '', 5), user_id, user_name, user2_id, user2_name, print_type)
+        return connect_four(Player('x'), aiplayer4.AIPlayer('o', '', 5), user_id, user_name, user2_id, user2_name, print_type)
     else:
-        connect_four(Player('x'), Player('o'), user_id, user_name, user2_id, user2_name, print_type)
+        return connect_four(Player('x'), Player('o'), user_id, user_name, user2_id, user2_name, print_type)
 
     
 def connect_four(player1, player2, user_id, user_name, user2_id, user2_name, print_type):
@@ -56,11 +56,12 @@ def connect_four(player1, player2, user_id, user_name, user2_id, user2_name, pri
     send_message(post_params)
     
     while True:
-        if process_move(player1, board, user_id, user_name, user2_id, user2_name):
-            return board
-
-        if process_move(player2, board, user_id, user_name, user2_id, user2_name):
-            return board
+        out, reason = process_move(player1, board, user_id, user_name, user2_id, user2_name)
+        if out:
+            return reason
+        out, reason = process_move(player2, board, user_id, user_name, user2_id, user2_name)
+        if out:
+            return reason
 
 def process_move(player, board, user_id, user_name, user2_id, user2_name):
     """ determines a move and if it is a win for a person
@@ -74,8 +75,7 @@ def process_move(player, board, user_id, user_name, user2_id, user2_name):
     if col == 'quit':
         post_params['text'] = 'Quitting...'
         send_message(post_params)
-        return True
-        return True
+        return (True, "quit")
     
     board.add_checker(player.checker, col)
 
@@ -91,28 +91,29 @@ def process_move(player, board, user_id, user_name, user2_id, user2_name):
             if player.checker == 'x':
                 post_params['text'] = 'Winner Winner Chicken Dinner!'
                 send_message(post_params)
-                return True
+                return (True, "win0")
             else:
                 post_params['text'] = 'You Lose.'
                 send_message(post_params)
-                return True
+                return (True, "lose")
         else:
             if player.checker == 'x':
                 post_params['text'] = user_name + ' Wins!'
                 post_params['attachments'] = [{"loci": [[0, len(user_name)]],"type": "mentions","user_ids": [user_id]}]
                 send_message(post_params)
-                return True
+                return (True, "win1")
             else:
                 post_params['text'] = user2_name + ' Wins!'
                 post_params['attachments'] = [{"loci": [[0, len(user2_name)]],"type": "mentions","user_ids": [user2_id]}]
                 send_message(post_params)
+                return (True, "win2")
     elif board.is_full():
 #        print("It's a tie!")
         post_params['text'] = "It's a tie."
         send_message(post_params)
-        return True
+        return (True, 'tie')
     else:
-        return False
+        return (False, False)
 
     
 class RandomPlayer(Player):
