@@ -427,8 +427,8 @@ def text_change_realness(name_list, ulist, message, reason, post_params):
     for i, name in enumerate(name_list):
         try:
             if (int(name_list) < 1 and i != 0 and name_list not in ulist.ids):
-                del names_list[i-1]
-                names.remove(name)
+                del name_list[i-1]
+                name_list.remove(name)
                 post_params['text']= 'That doesn\'t make sense'
                 send_message(post_params)
         except:
