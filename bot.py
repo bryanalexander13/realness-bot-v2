@@ -424,21 +424,16 @@ def text_change_realness(name_list, ulist, message, reason, post_params):
     :param Message message: message object that calls this function
     :param reason: type of adjust, add or subtract"""
     dmultiplier = 1
-    for i, name in enumerate(name_list):
-        try:
-            if (int(name_list) < 1 and i != 0 and name_list not in ulist.ids):
-                del name_list[i-1]
-                name_list.remove(name)
-                post_params['text']= 'That doesn\'t make sense'
-                send_message(post_params)
-        except:
-            continue
+    if name_list[0].isdigit() and name_list[0] not in ulist.ids:
+         del name_list[0]
+         post_params['text'] = "You need to put a name before a realness multiplier."
+         send_message(post_params)
     name_list = [ulist.findByName(strang).user_id if strang.isalpha() else strang for strang in name_list]
     if name_list.count('0') > 1:
         post_params['text'] = 'Invalid IDs'
         send_message(post_params)
         return
-    multiplier_bool = [bool(name.isdigit() and name not in ulist.ids) for name in name_list]
+    multiplier_bool = [bool((name.lstrip('-').isdigit()) and name not in ulist.ids) for name in name_list]
     realness_list=[]
     for i, name in enumerate(name_list):
         if (name in ulist.ids):
@@ -449,18 +444,20 @@ def text_change_realness(name_list, ulist, message, reason, post_params):
                     realness_list.append((name,dmultiplier))
             except:
                 realness_list.append((name,dmultiplier))
-    if len(realness_list) == 0:
-        return
     text = str()
     if reason == 'add':
         text = 'Real '
     elif reason == 'subtract':
         text = 'Not Real '
     for actual_id in realness_list:
-        if adjust_realness(actual_id[0], ulist, message, reason, post_params, actual_id[1]):
+        if int(actual_id[1]) < 1:
+            post_params['text'] = 'That doesn\'t make sense.'
+            send_message(post_params)
+        elif adjust_realness(actual_id[0], ulist, message, reason, post_params, actual_id[1]):
             text += ulist.find(actual_id[0]).name.capitalize() + ' '+ str(actual_id[1]) + '. '
-    post_params['text'] = text
-    send_message(post_params)
+    if text != 'Real ' and text != 'Not Real ':
+        post_params['text'] = text
+        send_message(post_params)
     if (reason == 'subtract' and ulist.findByName("carter").user_id in realness_list):
         post_params['text'] = 'It is terminal.'
         send_message(post_params)
@@ -617,7 +614,7 @@ def very_real(text, message, ulist, post_params):
 
     if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
         for i, id in enumerate(message.attachments[0]['user_ids']):
-            text = text.replace((message.text[message.attachments[0]['loci'][i][0] : message.attachments[0]['loci'][i][0]+message.attachments[0]['loci'][i][1]]).lower(),id)
+            text = text.replace((message.text[message.attachments[0]['loci'][i][0] : message.attachments[0]['loci'][i][0]+message.attachments[0]['loci'][i][1]]).lower(),' '+id+' ')
         nameslist = text.lower().split('very real')[1].split()
     else:
         nameslist = text.lower().split('very real')[1].split()
@@ -634,7 +631,7 @@ def not_real(text, message, ulist, post_params):
         send_message(post_params)
     if (message.attachments!= [] and message.attachments[0]['type'] == 'mentions'):
         for i, id in enumerate(message.attachments[0]['user_ids']):
-            text = text.replace((message.text[message.attachments[0]['loci'][i][0] : message.attachments[0]['loci'][i][0]+message.attachments[0]['loci'][i][1]]).lower(),id)
+            text = text.replace((message.text[message.attachments[0]['loci'][i][0] : message.attachments[0]['loci'][i][0]+message.attachments[0]['loci'][i][1]]).lower(),' '+id+' ')
         nameslist = text.lower().split('not real')[1].split()
     else:
         nameslist = text.lower().split('not real')[1].split()
@@ -796,7 +793,7 @@ def startup():
     user_dict = users_load()
     userlist = UserList(user_dict)
     auth = auth_load()
-    bot = auth['equipo']
+    bot = auth['test']
     group_id = bot['group_id']
     request_params = {'token':auth['token']}
     post_params = {'text':'','bot_id':bot['bot_id'],'attachments':[]}
