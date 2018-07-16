@@ -4,10 +4,11 @@ import json
 import os
 from datetime import datetime, timedelta
 import play4
+import random
 
 class User:
     """Users information"""
-    def __init__(self, user_id, name, nickname, realness = 0, abilities = [], protected = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"), thornmail = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")):
+    def __init__(self, user_id, name, nickname, realness = 0, abilities = [], protected = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"), thornmail = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"), reward = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S.%f")):
         self.user_id = user_id
         self.name = name
         self.nickname = nickname
@@ -15,6 +16,7 @@ class User:
         self.abilities = abilities
         self.protected = self.datetime_read(protected)
         self.thornmail = self.datetime_read(thornmail)
+        self.reward = self.datetime_read(reward)
         self.switch = {"protect" : "self.protect(ability.val)",
                        "thornmail" : "self.thornmailed(ability.val)",
                        "bomb" : "self.bomb(person, ulist, message, ability.val, post_params)"}
@@ -28,7 +30,8 @@ class User:
                 "realness": self.realness,
                 "abilities": self.ability_write(),
                 "protected": self.datetime_write(self.protected),
-                "thornmail": self.datetime_write(self.thornmail)}
+                "thornmail": self.datetime_write(self.thornmail),
+                "reward": self.datetime_write(self.reward)}
 
     def add_realness(self, multiplier=1):
         self.realness += multiplier
@@ -80,6 +83,27 @@ class User:
     def bomb(self, person, ulist, message, power, post_params):
         adjust_realness(person, ulist, message, "subtract", post_params, multiplier=10*power)
 
+    def daily_reward(self, post_params):
+        if self.reward <= datetime.now() - timedelta(days=1):
+            ran = random.randint(0,1)
+            if ran == 0:
+                rew = max(min(round(abs(random.gauss(5,5)-5)), 10), 1) 
+                self.add_realness(rew)
+                post_params['text'] = "You got " + str(rew) + "rp"
+                send_message(post_params)
+            else:
+                ran = random.randint(0,2)
+                if ran == 0:
+                    ab = Ability('protect', max(min(round(abs(random.gauss(3,1) -3)), 3), 1))
+                elif ran == 1:
+                    ab = Ability('thornmail', max(min(round(abs(random.gauss(3,1) -3)), 3), 1))
+                elif ran == 2:
+                    ab = Ability('bomb', max(min(round(abs(random.gauss(3,1) -3)), 3), 1))
+                self.add_ability(ab)
+                post_params['text'] = "You got a " + ab.type + " " + str(ab.val)
+                send_message(post_params)
+            self.reward = datetime.now()
+                
     def datetime_write(self, date):
         return date.strftime("%Y-%m-%d %H:%M:%S.%f")
 
@@ -116,10 +140,10 @@ class Ability:
 class UserList:
     def __init__(self, udict):
         try:
-            self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected'], i['thornmail']) for i in udict]
+            self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected'], i['thornmail'], i['reward']) for i in udict]
         except:
             try:
-                self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected']) for i in udict]
+                self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected'], i['thornmail']) for i in udict]
             except:
                 self.ulist = [User(i['user_id'], i["name"], i['nickname']) for i in udict]
         self.ids = {i.user_id:i for i in self.ulist}
@@ -730,6 +754,9 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id):
 
             elif (text.startswith("help")):
                 helper_specific(post_params, text)
+                
+            elif (text.startswith('reward')):
+                ulist.find(message.sender_id).daily_reward(post_params)
 
             elif (text.startswith('here')):
                 timerlist.cancel_timer(message.user_id, post_params)
