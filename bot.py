@@ -5,6 +5,7 @@ import os
 from datetime import datetime, timedelta
 import play4
 import random
+from reddit_bot import Reddit
 
 class User:
     """Users information"""
@@ -85,8 +86,8 @@ class User:
 
     def daily_reward(self, post_params):
         if self.reward <= datetime.now() - timedelta(days=1):
-            ran = random.randint(0,1)
-            if ran == 0:
+            ran = random.randint(0,9)
+            if ran > 2:
                 rew = max(min(round(abs(random.gauss(5,5)-5)), 10), 1) 
                 self.add_realness(rew)
                 post_params['text'] = "You got " + str(rew) + "rp"
@@ -375,7 +376,13 @@ def stat_write(stat):
         s.close()
 
 def update_everyone(request_params, group_id, ulist, auth):
-    group = requests.get('https://api.groupme.com/v3/groups/' +group_id, params = request_params).json()['response']
+    try:
+        group = requests.get('https://api.groupme.com/v3/groups/' +group_id, params = request_params).json()['response']
+    except:
+        time.sleep(5)
+        update_everyone(request_params, group_id, ulist, auth)
+        return
+    
     if group['id'] == auth['equipo']['group_id']:
         for member in group['members']:
             user = ulist.find(member['user_id'])
@@ -487,7 +494,7 @@ def text_change_realness(name_list, ulist, message, reason, post_params):
         send_message(post_params)
 
 #reads messages and creates message_list of Message objects
-def read_messages(request_params, group_id, ulist, post_params, auth, timerlist):
+def read_messages(request_params, group_id, ulist, post_params, auth, timerlist, red):
     """Reads in messages from GroupMe API through requests.get().
     Converts messages into Message objects. Filters system and bot messages.
     Updates ulist with update method of UserList.  Calls commands().  Calls
@@ -526,7 +533,7 @@ def read_messages(request_params, group_id, ulist, post_params, auth, timerlist)
         if mess.sender_type == 'bot' or mess.sender_type == 'system':
             continue
         else:
-            commands(mess, ulist, post_params, timerlist, request_params, group_id)
+            commands(mess, ulist, post_params, timerlist, request_params, group_id, red)
             update_everyone(request_params, group_id, ulist, auth)
             users_write(ulist)
 
@@ -723,10 +730,20 @@ def play(ulist, user_id, user_name, user2_id = '', user2_name = '', print_type =
     elif outcome == "win2":
         ulist.find(user2_id).add_realness(5)
         ulist.find(user_id).subtract_realness(5)
+        
 
+def joke(post_params, red):
+    text = red.joke()
+    post_params['text'] = text
+    send_message(post_params)
+
+def toot(post_params, red):
+    text = red.tootz()
+    post_params['text'] = text
+    send_message(post_params)
         
 #checks for last message and runs commands
-def commands(message, ulist, post_params, timerlist, request_params, group_id):
+def commands(message, ulist, post_params, timerlist, request_params, group_id, red):
     if message.text == None:
         return
     elif message.text.lower().startswith('here'):
@@ -761,10 +778,16 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id):
             elif (text.startswith('here')):
                 timerlist.cancel_timer(message.user_id, post_params)
 
-            elif (text.lower().startswith('shop')):
+            elif (text.startswith('shop')):
                 shop((text.split('shop')), message, ulist, post_params)
+                
+            elif (text.startswith('joke')):
+                joke(post_params, red)
+                
+            elif (text.startswith('toot')):
+                toot(post_params, red)
 
-            elif (text.lower().startswith('use')):
+            elif (text.startswith('use')):
                 rest = text.split('use')[1].strip().split(' ')
                 ulist.find(message.sender_id).use_ability(rest, ulist, message, post_params)
 
@@ -816,9 +839,9 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id):
                 helper_main(post_params)
 
 
-def run(request_params, post_params, timerlist, group_id, userlist, auth):
+def run(request_params, post_params, timerlist, group_id, userlist, auth, red):
     while (1 == True):
-        message_list = read_messages(request_params, group_id, userlist, post_params, auth, timerlist)
+        message_list = read_messages(request_params, group_id, userlist, post_params, auth, timerlist, red)
 
         timerlist.check(post_params)
 
@@ -827,8 +850,9 @@ def run(request_params, post_params, timerlist, group_id, userlist, auth):
 def startup():
     user_dict = users_load()
     userlist = UserList(user_dict)
+    red = Reddit()
     auth = auth_load()
-    bot = auth['equipo']
+    bot = auth['test']
     group_id = bot['group_id']
     request_params = {'token':auth['token']}
     post_params = {'text':'','bot_id':bot['bot_id'],'attachments':[]}
@@ -837,7 +861,7 @@ def startup():
     for user in sorted(userlist.ulist, key=lambda x: x.realness):
         text += user.nickname +': ' + str(user.realness) + '\n'
     print(text)
-    run(request_params, post_params, timerlist, group_id, userlist, auth)
+    run(request_params, post_params, timerlist, group_id, userlist, auth, red)
 
 
 if __name__ == "__main__":
