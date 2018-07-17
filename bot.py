@@ -370,6 +370,11 @@ def last_write(last_message):
             l.write(json.dumps({'last_read':last_message}))
             l.close()
 
+def idea_write(idea):
+    with open(os.path.abspath('idea.txt'),'a') as f:
+        f.write('|||' + idea)
+        f.close()
+
 def stat_write(stat):
     with open(os.path.abspath('users2.json'),'a') as s:
         s.write(str(stat) + '\n')
@@ -741,6 +746,25 @@ def toot(post_params, red):
     text = red.tootz()
     post_params['text'] = text
     send_message(post_params)
+    
+def meme(post_params, red):
+    text = red.meme().split('||')
+    post_params['text'] = text[0]
+    try:
+        post_params['attachments'] = [{'type': 'image', 'url': text[1]}]
+        send_message(post_params)
+        post_params['attachments'] = []
+    except:
+        send_message(post_params)
+        
+def idea(post_params, text):
+    rest = text.split('idea')
+    if len(rest) == 1:
+        post_params['text'] = "You didn't give me an idea"
+        send_message(post_params)
+        return
+    else:
+        idea_write(rest[1])
         
 #checks for last message and runs commands
 def commands(message, ulist, post_params, timerlist, request_params, group_id, red):
@@ -786,6 +810,12 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
                 
             elif (text.startswith('toot')):
                 toot(post_params, red)
+                
+            elif (text.startswith('meme')):
+                meme(post_params, red)
+                
+            elif (text.startswith('idea')):
+                idea(post_params, text)
 
             elif (text.startswith('use')):
                 rest = text.split('use')[1].strip().split(' ')

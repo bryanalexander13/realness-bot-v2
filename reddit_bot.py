@@ -22,27 +22,41 @@ class Reddit:
             file = auth.readlines()
             data = json.loads(file[0])
             auth.close()
-        return data["app_id"], data["app_secret"]
+            return data["app_id"], data["app_secret"]
+
+    def read_comments(self):
+        with open(os.path.abspath('val.json'),'r') as f:
+            file = f.readlines()
+            comments = json.loads(file[0])
+            f.close()
+            return comments
 
     def joke(self):
-        hot = self.reddit.subreddit('jokes').top(limit = 1000)
+        top = self.reddit.subreddit('jokes').top('all', limit = 1000)
         ran = random.randint(0,999)
         
-        for i, post in enumerate(hot):
+        for i, post in enumerate(top):
             if i == ran:
-                submission = self.reddit.submission(post)
-                return submission.title + '\n\n' + submission.selftext
+                return post.title + '\n\n' + post.selftext
+    
+    def meme(self):
+        top = self.reddit.subreddit('dankmemes').top('all', limit = 1000)
+        ran = random.randint(0,999)
+        for i, post in enumerate(top):
+            if i == ran:
+                return post.title + '||' + post.url
     
     def tootz(self):
-        toot = self.reddit.redditor('tootznslootz')
-        comments = toot.comments.new(limit = None)
+        try:
+            toot = self.reddit.redditor('tootznslootz')
+            comments = toot.comments.new(limit = None)
+        except:
+            comments = self.read_comments()["comments"]
         ran = random.randint(0, 999)
         
         for i, comment in enumerate(comments):
             if i == ran:
-                return (comment.body + '\n\n-TootznSlootz')
-            
+                return (comment.body + '\n\n-TootznSlootz')    
     
-    
-    
+        print('uh, oh', ran)
     
