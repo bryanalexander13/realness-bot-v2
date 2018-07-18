@@ -42,6 +42,7 @@ class Reddit:
     def meme(self):
         top = self.reddit.subreddit('dankmemes').top('all', limit = 1000)
         ran = random.randint(0,999)
+        
         for i, post in enumerate(top):
             if i == ran:
                 return post.title + '||' + post.url
@@ -50,13 +51,38 @@ class Reddit:
         try:
             toot = self.reddit.redditor('tootznslootz')
             comments = toot.comments.new(limit = None)
+            ran = random.randint(0, 999)
+        
+            for i, comment in enumerate(comments):
+                if i == ran:
+                    return (comment.body + '\n\n-TootznSlootz' + ' ' + str(comment.score))   
         except:
             comments = self.read_comments()["comments"]
-        ran = random.randint(0, 999)
+            
+            ran = random.randint(0, 999)
         
-        for i, comment in enumerate(comments):
-            if i == ran:
-                return (comment.body + '\n\n-TootznSlootz')    
+            for i, comment in enumerate(comments):
+                if i == ran:
+                    return (comment + '\n\n-TootznSlootz' )   
     
         print('uh, oh', ran)
     
+    def red_pill(self):
+        red = self.reddit.subreddit('The_Donald').top('all', limit = 1000)
+        ran = random.randint(0,999)
+    
+        for i, post in enumerate(red):
+            if i == ran:
+                return post.title + '||' + post.selftext + '||' + post.url
+            
+    def blue_pill(self):
+        blue = self.reddit.subreddit('esist').top('all', limit = 1000)
+        ran = random.randint(0,999)
+    
+        for i, post in enumerate(blue):
+            if i == ran:
+                print(post.title + '||' + post.selftext + '||' + post.url)
+                return post.title + '||' + post.selftext + '||' + post.url
+        
+        
+        

@@ -766,6 +766,28 @@ def idea(post_params, text):
     else:
         idea_write(rest[1])
         
+
+def blue_pill(post_params, red):
+    text = red.blue_pill().split('||')
+    post_params['text'] = text[0] + '\n' + text[1] + '\n' + text[2]
+    if ('imgur' in text[2] or 'redd' in text[2]):
+        post_params['attachments'] = [{'type': 'image', 'url': text[2]}]
+        send_message(post_params)
+        post_params['attachments'] = []
+    else:
+        send_message(post_params)
+    
+    
+def red_pill(post_params, red):
+    text = red.red_pill().split('||')
+    post_params['text'] = text[0] + '\n' + text[1] + '\n' + text[2]
+    if ('imgur' in text[2] or 'redd' in text[2]):
+        post_params['attachments'] = [{'type': 'image', 'url': text[2]}]
+        send_message(post_params)
+        post_params['attachments'] = []
+    else:
+        send_message(post_params)
+        
 #checks for last message and runs commands
 def commands(message, ulist, post_params, timerlist, request_params, group_id, red):
     if message.text == None:
@@ -816,6 +838,12 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
                 
             elif (text.startswith('idea')):
                 idea(post_params, text)
+            
+            elif (text.startswith('red pill')):
+                red_pill(post_params, red)
+                
+            elif (text.startswith('blue pill')):
+                blue_pill(post_params, red)
 
             elif (text.startswith('use')):
                 rest = text.split('use')[1].strip().split(' ')
