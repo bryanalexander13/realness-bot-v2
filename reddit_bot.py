@@ -60,12 +60,10 @@ class Reddit:
             comments = self.read_comments()["comments"]
             
             ran = random.randint(0, 999)
-        
             for i, comment in enumerate(comments):
                 if i == ran:
                     return (comment + '\n\n-TootznSlootz' )   
     
-        print('uh, oh', ran)
     
     def red_pill(self):
         red = self.reddit.subreddit('The_Donald').top('all', limit = 1000)
@@ -81,7 +79,6 @@ class Reddit:
     
         for i, post in enumerate(blue):
             if i == ran:
-                print(post.title + '||' + post.selftext + '||' + post.url)
                 return post.title + '||' + post.selftext + '||' + post.url
         
         

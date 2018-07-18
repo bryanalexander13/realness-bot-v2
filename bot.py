@@ -738,17 +738,29 @@ def play(ulist, user_id, user_name, user2_id = '', user2_name = '', print_type =
         
 
 def joke(post_params, red):
-    text = red.joke()
+    try:
+        text = red.joke()
+    except:
+        text = "joke"
     post_params['text'] = text
     send_message(post_params)
 
 def toot(post_params, red):
-    text = red.tootz()
+    try:
+        text = red.tootz()
+    except:
+        text = "toot"
     post_params['text'] = text
     send_message(post_params)
     
 def meme(post_params, red):
-    text = red.meme().split('||')
+    try:
+        text = red.meme().split('||')
+    except:
+        post_params['text'] = "meme"
+        send_message(post_params)
+        return
+        
     post_params['text'] = text[0]
     try:
         post_params['attachments'] = [{'type': 'image', 'url': text[1]}]
@@ -762,13 +774,15 @@ def idea(post_params, text):
     if len(rest) == 1:
         post_params['text'] = "You didn't give me an idea"
         send_message(post_params)
-        return
     else:
         idea_write(rest[1])
         
 
 def blue_pill(post_params, red):
-    text = red.blue_pill().split('||')
+    try:
+        text = red.blue_pill().split('||')
+    except:
+        text = ['Trump REEEEEEEEEEEE','','']
     post_params['text'] = text[0] + '\n' + text[1] + '\n' + text[2]
     if ('imgur' in text[2] or 'redd' in text[2]):
         post_params['attachments'] = [{'type': 'image', 'url': text[2]}]
@@ -779,7 +793,10 @@ def blue_pill(post_params, red):
     
     
 def red_pill(post_params, red):
-    text = red.red_pill().split('||')
+    try:
+        text = red.red_pill().split('||')
+    except:
+        text = ['$hillary REEEEEEEEEEEE','','']
     post_params['text'] = text[0] + '\n' + text[1] + '\n' + text[2]
     if ('imgur' in text[2] or 'redd' in text[2]):
         post_params['attachments'] = [{'type': 'image', 'url': text[2]}]
@@ -910,7 +927,7 @@ def startup():
     userlist = UserList(user_dict)
     red = Reddit()
     auth = auth_load()
-    bot = auth['test']
+    bot = auth['equipo']
     group_id = bot['group_id']
     request_params = {'token':auth['token']}
     post_params = {'text':'','bot_id':bot['bot_id'],'attachments':[]}
