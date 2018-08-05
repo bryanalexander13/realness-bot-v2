@@ -9,12 +9,13 @@ from reddit_bot import Reddit
 
 class User:
     """Users information"""
-    def __init__(self, user_id, name, nickname, realness = 0, abilities = [], protected = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"), thornmail = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"), reward = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S.%f")):
+    def __init__(self, user_id, name, nickname, realness = 0, abilities = [], protected = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"), thornmail = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"), reward = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S.%f"), permission = 'user'):
         self.user_id = user_id
         self.name = name
         self.nickname = nickname
         self.realness = realness
         self.abilities = abilities
+        self.permission = permission
         self.protected = self.datetime_read(protected)
         self.thornmail = self.datetime_read(thornmail)
         self.reward = self.datetime_read(reward)
@@ -32,7 +33,8 @@ class User:
                 "abilities": self.ability_write(),
                 "protected": self.datetime_write(self.protected),
                 "thornmail": self.datetime_write(self.thornmail),
-                "reward": self.datetime_write(self.reward)}
+                "reward": self.datetime_write(self.reward),
+                "permission": self.permission}
         
 
     def add_realness(self, multiplier=1):
@@ -65,7 +67,6 @@ class User:
             for ability in self.abilities:
                 if (rest[0] == ability.type and int(rest[1]) == ability.val):
                     self.remove_ability(ability)
-                    person = message.attachments[0]['user_ids'][0]
                     exec(self.switch[ability.type])
                     post_params['text'] = "Ability used"
                     send_message(post_params)
@@ -77,13 +78,13 @@ class User:
             send_message(post_params)
 
     def protect(self, time):
-        self.protected = datetime.now() + timedelta(hours = time)
+        self.protected = datetime.now() + timedelta(days = time)
 
     def thornmailed(self, time):
-        self.thornmail = datetime.now() + timedelta(hours = time)
+        self.thornmail = datetime.now() + timedelta(days = time)
 
     def bomb(self, person, ulist, message, power, post_params):
-        adjust_realness(person, ulist, message, "subtract", post_params, multiplier=10*power)
+        person.adjustRealness(ulist, message, "subtract", post_params, multiplier=10*power)
 
     def daily_reward(self, post_params):
         if self.reward <= datetime.now() - timedelta(days=1):
@@ -160,10 +161,10 @@ class Ability:
 class UserList:
     def __init__(self, udict):
         try:
-            self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected'], i['thornmail'], i['reward']) for i in udict]
+            self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected'], i['thornmail'], i['reward'], i['permission']) for i in udict]
         except:
             try:
-                self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected'], i['thornmail']) for i in udict]
+                self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected'], i['thornmail'], i['reward']) for i in udict]
             except:
                 self.ulist = [User(i['user_id'], i["name"], i['nickname']) for i in udict]
         self.ids = {i.user_id:i for i in self.ulist}
@@ -232,6 +233,15 @@ class UserList:
         else:
             user.nickname = message.name
             return True
+    
+    def clearRealness(self, sender):
+        if (self.find(sender).permission == 'admin'):
+            for user in self.ulist:
+                user.realness = 0
+            return ReturnObject(True)
+        else:
+            return ReturnObject(False, "Sorry, only admins have this ability")
+        
 
 
 class Timer:
@@ -558,9 +568,9 @@ def read_messages(request_params, group_id, ulist, post_params, auth, timerlist,
             continue
         else:
             update_everyone(request_params, group_id, ulist, auth)
-            users_write(ulist)
             commands(mess, ulist, post_params, timerlist, request_params, group_id, red)
-
+            users_write(ulist)
+            
     if len(message_list) > 0:
         last_write(message_list[0].id)
 
@@ -709,6 +719,15 @@ def not_real(text, message, ulist, post_params):
             post_params['text'] = post_text.obj
             send_message(post_params)
 
+def clear(ulist, sender_id, post_params):
+    result = ulist.clearRealness(sender_id)
+    if (not result.success):
+        post_params['text'] = result.obj
+        send_message(post_params)
+    else:
+        post_params['text'] = 'Cleared'
+        send_message(post_params)
+        
 def shop(text, message, ulist, post_params):
     text = text[1].strip().split(' ')
     if text[0] in ['protect', 'thornmail', 'bomb']:
@@ -729,7 +748,7 @@ def shop(text, message, ulist, post_params):
                     person.add_ability(Ability(text[0], int(text[1])))
                     person.realness -= 15 * int(text[1])
 
-                    post_params['text'] = "Ok, 1 " +text[0]+ " ability. That'll last yah " + text[1] + ' hours.'
+                    post_params['text'] = "Ok, 1 " +text[0]+ " ability. That'll last yah " + text[1] + ' days.'
                     send_message(post_params)
                 else:
                     post_params['text'] = 'Fuck off peasant.'
@@ -903,7 +922,10 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
             elif (text.startswith('use')):
                 rest = text.split('use')[1].strip().split(' ')
                 ulist.find(message.sender_id).use_ability(rest, ulist, message, post_params)
-
+            
+            elif (text == 'clear'):
+                clear(ulist, message.sender_id, post_params)
+            
             elif (text.startswith('play')):
                 t = text.split(' ')
                 if len(t) == 1 or len(t) == 2:
