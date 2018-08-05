@@ -395,6 +395,17 @@ class Parser():
             else:
                 return ReturnObject(True)      
     
+    def removeMentions(self):
+        user_ids = self.message.attachments[0]['user_ids'][::-1]
+        locations = self.message.attachments[0]['loci'][::-1]
+        for ind, user in enumerate(user_ids):
+            person = self.ulist.find(user)
+            replacement = person.name
+            location = locations[ind]
+            self.message.text = self.message.text[0:location[0]] + replacement + self.message.text[location[0] + location[1]:]
+        self.text = self.message.text[4:].lower()
+        self.split = self.text.split(' ')[2:]
+    
     def findPeopleAndAmounts(self):
         check = 'person'
         for word in self.split:
@@ -433,17 +444,6 @@ class Parser():
             return ReturnObject(True)
         else:
             return ReturnObject(False, "Invalid Amount(s)")
-        
-    def removeMentions(self):
-        user_ids = self.message.attachments[0]['user_ids'][::-1]
-        locations = self.message.attachments[0]['loci'][::-1]
-        for ind, user in enumerate(user_ids):
-            person = self.ulist.find(user)
-            replacement = person.name
-            location = locations[ind]
-            self.message.text = self.message.text[0:location[0]] + replacement + self.message.text[location[0] + location[1]:]
-        self.text = self.message.text[4:].lower()
-        self.split = self.text.split(' ')[2:]
                 
         
 def myconverter(o):
@@ -574,7 +574,6 @@ def read_messages(request_params, group_id, ulist, post_params, auth, timerlist,
     if len(message_list) > 0:
         last_write(message_list[0].id)
 
-    return message_list
 
 
 def helper_main(post_params):
@@ -976,7 +975,7 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
 
 def run(request_params, post_params, timerlist, group_id, userlist, auth, red):
     while (1 == True):
-        message_list = read_messages(request_params, group_id, userlist, post_params, auth, timerlist, red)
+        read_messages(request_params, group_id, userlist, post_params, auth, timerlist, red)
 
         timerlist.check(post_params)
 
