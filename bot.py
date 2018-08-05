@@ -33,6 +33,7 @@ class User:
                 "protected": self.datetime_write(self.protected),
                 "thornmail": self.datetime_write(self.thornmail),
                 "reward": self.datetime_write(self.reward)}
+        
 
     def add_realness(self, multiplier=1):
         self.realness += multiplier
@@ -129,6 +130,22 @@ class User:
         else:
             post_params['text'] = str(self.__dict__()[val])
             send_message(post_params)
+            
+    def adjustRealness(self, message, reason, ulist, multiplier = 1):
+        if (message.sender_id == self.user_id):
+            return ReturnObject(False, "You can't adjust your own realness")
+        elif (reason == 'add'):
+            self.add_realness(multiplier)
+            return ReturnObject(True)
+        else:
+            if self.protected > datetime.now():
+                return ReturnObject(False, 'Sorry, ' + self.nickname + ' is protected.')
+            elif self.thornmail > datetime.now():
+                ulist.find(message.sender_id).realness -= multiplier
+                return ReturnObject(False, 'Sorry, ' + self.nickname + ' is protected.')
+            else:
+                self.subtract_realness(multiplier)
+                return ReturnObject(True)
 
 
 
@@ -151,6 +168,7 @@ class UserList:
         self.names = {i.name:i for i in self.ulist}
         self.nicknames = {i.nickname:i for i in self.ulist}
         self.realnesses = {i.realness:i for i in self.ulist}
+        self.peopleFinders = [self.find, self.findByName, self.findByNickname]
 
     def find(self, user_id):
         try:
@@ -169,6 +187,13 @@ class UserList:
             return self.nicknames[nickname]
         except:
             return User("0", "invalid", "invalid")
+        
+    def findPerson(self, word):
+        for finder in self.peopleFinders:
+            person = finder(word)
+            if (person.name != 'invalid'):
+                return ReturnObject(True, person)
+        return ReturnObject(False)
 
     def findByRealness(self, realness):
         try:
@@ -322,8 +347,93 @@ class Message:
 
     def count_likes(self):
         return len(self.liked)
+    
+class ReturnObject:
+    def __init__(self, success = False, obj = None):
+        self. success = success
+        self.obj = obj
 
 
+class Parser():
+    def __init__(self, text, message, ulist):
+        self.text = text
+        self.message = message
+        self.ulist = ulist
+        self.split = []
+        self.numbers = []
+        self.totals = {}
+        self.currentPersonToChange = None
+        
+    def whoToChange(self):
+        validate = self.valid_command()
+        if (not validate.success):
+            return validate
+        if (self.message.attachments != []):
+            self.removeMentions()
+        return self.findPeopleAndAmounts()
+    
+    def valid_command(self):
+        strip_command = self.text.split(' ')[2:] 
+        if (strip_command == []):
+            return ReturnObject(False, "You need to tell me a person too.")
+        else:
+            self.split = strip_command
+            if (len(self.split) == 1 and self.split[0].isdigit()):
+                return ReturnObject(False, "You need to tell me a person too.")
+            else:
+                return ReturnObject(True)      
+    
+    def findPeopleAndAmounts(self):
+        check = 'person'
+        for word in self.split:
+            if (check == 'amount'):
+                result = self.addAmountToPerson(word)
+                check = 'person'
+                if (result.success):
+                    continue
+                
+            if (check == 'person'):
+                personResult = self.addPersonToTotal(word)
+                if (not personResult.success):
+                    return personResult
+                check = 'amount'
+            
+        return ReturnObject(True, self.totals)
+            
+    def addPersonToTotal(self, word):
+        person = self.ulist.findPerson(word)
+        if (person.success):
+            self.currentPersonToChange = person.obj
+            try:
+                self.totals[person.obj] += 1
+            except:
+                self.totals[person.obj] = 1
+            return ReturnObject(True)
+        else: 
+            return ReturnObject(False, "Invalid Person(s)")
+    
+    def addAmountToPerson(self, word):
+        if word.isdigit():
+            try:
+                self.totals[self.currentPersonToChange] += (int(word) - 1)
+            except:
+                self.totals[self.currentPersonToChange] = (int(word) - 1)
+            return ReturnObject(True)
+        else:
+            return ReturnObject(False, "Invalid Amount(s)")
+        
+    def removeMentions(self):
+        user_ids = self.message.attachments[0]['user_ids'][::-1]
+        locations = self.message.attachments[0]['loci'][::-1]
+        for ind, user in enumerate(user_ids):
+            person = self.ulist.find(user)
+            replacement = person.name
+            location = locations[ind]
+            self.message.text = self.message.text[0:location[0]] + replacement + self.message.text[location[0] + location[1]:]
+        self.text = self.message.text[4:].lower()
+        self.split = self.text.split(' ')[2:]
+                
+        
 def myconverter(o):
     if isinstance(o, datetime.datetime):
         return o.__str__()
@@ -405,17 +515,6 @@ def send_message(post_params):
     :param dict post_params: bot_id, text required"""
     requests.post("https://api.groupme.com/v3/bots/post", json = post_params)
 
-def remove_mention_text(message, ulist):
-    """Removes mention text from message (@nickname).
-    :param Message message: message object to act on
-    :param UserList ulist: user list of User objects
-    :return str: message text"""
-    message_text = message.text
-    for user in message.attachments[0]['user_ids']:
-        mention = '@'+ (ulist.find(user).nickname)
-        message_text = message_text.replace(mention,'')
-    return message_text
-
 #changes realness in dictionary, updates
 def adjust_realness(target_id, ulist, message, reason, post_params, multiplier=1):
     """Adds or subtracts realness from User. Calls add_realness() or
@@ -450,53 +549,6 @@ def adjust_realness(target_id, ulist, message, reason, post_params, multiplier=1
             return True
     users_write(ulist)
     return True
-
-def text_change_realness(name_list, ulist, message, reason, post_params):
-    """Adds or Subtracts realness with multiple values. Posts messages with
-    realness updates.  Calls send_message() and adjust_realness(). Uses findByName
-    method of UserList.
-    :param list name_list: ids with multiplier value following the id
-    :param UserList ulist: user list of User objects
-    :param Message message: message object that calls this function
-    :param reason: type of adjust, add or subtract"""
-    dmultiplier = 1
-    if name_list[0].isdigit() and name_list[0] not in ulist.ids:
-         del name_list[0]
-         post_params['text'] = "You need to put a name before a realness multiplier."
-         send_message(post_params)
-    name_list = [ulist.findByName(strang).user_id if strang.isalpha() else strang for strang in name_list]
-    if name_list.count('0') > 1:
-        post_params['text'] = 'Invalid IDs'
-        send_message(post_params)
-        return
-    multiplier_bool = [bool((name.lstrip('-').isdigit()) and name not in ulist.ids) for name in name_list]
-    realness_list=[]
-    for i, name in enumerate(name_list):
-        if (name in ulist.ids):
-            try:
-                if multiplier_bool[i+1]:
-                    realness_list.append((name,int(name_list[i+1])))
-                else:
-                    realness_list.append((name,dmultiplier))
-            except:
-                realness_list.append((name,dmultiplier))
-    text = str()
-    if reason == 'add':
-        text = 'Real '
-    elif reason == 'subtract':
-        text = 'Not Real '
-    for actual_id in realness_list:
-        if int(actual_id[1]) < 1:
-            post_params['text'] = 'That doesn\'t make sense.'
-            send_message(post_params)
-        elif adjust_realness(actual_id[0], ulist, message, reason, post_params, actual_id[1]):
-            text += ulist.find(actual_id[0]).name.capitalize() + ' '+ str(actual_id[1]) + '. '
-    if text != 'Real ' and text != 'Not Real ':
-        post_params['text'] = text
-        send_message(post_params)
-    if (reason == 'subtract' and ulist.findByName("carter").user_id in realness_list):
-        post_params['text'] = 'It is terminal.'
-        send_message(post_params)
 
 #reads messages and creates message_list of Message objects
 def read_messages(request_params, group_id, ulist, post_params, auth, timerlist, red):
@@ -538,9 +590,9 @@ def read_messages(request_params, group_id, ulist, post_params, auth, timerlist,
         if mess.sender_type == 'bot' or mess.sender_type == 'system':
             continue
         else:
-            commands(mess, ulist, post_params, timerlist, request_params, group_id, red)
             update_everyone(request_params, group_id, ulist, auth)
             users_write(ulist)
+            commands(mess, ulist, post_params, timerlist, request_params, group_id, red)
 
     if len(message_list) > 0:
         last_write(message_list[0].id)
@@ -638,41 +690,57 @@ def helper_specific(post_params, text):
         helper_main(post_params)
 
 
+def remove_realness(change_dict, message, ulist, post_params):
+    text = 'Not Real. '
+    for user in change_dict.keys():
+        result = user.adjustRealness(message, 'add', ulist, change_dict[user])
+        if (not result.success):
+            post_params['text'] = result.obj
+            send_message(post_params)
+        else:
+            text += user.name.capitalize() + '. '
+    if (text != 'Not Real. '):
+        return ReturnObject(True, text)
+    else:
+        return ReturnObject(False)
+
+def add_realness(change_dict, message, ulist, post_params):
+    text = 'Very Real. '
+    for user in change_dict.keys():
+        result = user.adjustRealness(message, 'add', ulist, change_dict[user])
+        if (not result.success):
+            post_params['text'] = result.obj
+            send_message(post_params)
+        else:
+            text += user.name.capitalize() + '. '
+    if (text != 'Very Real. '):
+        return ReturnObject(True, text)
+    else:
+        return ReturnObject(False)
+
 def very_real(text, message, ulist, post_params):
-    """Parses very real text command.  Calls text_change_realness() to add
-    realness.
-    :param str text: text after @rb command
-    :param Message message: message calling this command
-    :param UserList ulist: user list of User objects"""
-    if len(text.split('very real')[1]) == 0:
-        post_params['text'] = 'Nothing to add realness to.'
+    parser = Parser(text, message, ulist)
+    result = parser.whoToChange()
+    if (not result.success):
+        post_params['text'] = result.obj
         send_message(post_params)
-
-    if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
-        for i, id in enumerate(message.attachments[0]['user_ids']):
-            text = text.replace((message.text[message.attachments[0]['loci'][i][0] : message.attachments[0]['loci'][i][0]+message.attachments[0]['loci'][i][1]]).lower(),' '+id+' ')
-        nameslist = text.lower().split('very real')[1].split()
     else:
-        nameslist = text.lower().split('very real')[1].split()
-    text_change_realness(nameslist, ulist, message, 'add', post_params)
-
+        post_text = add_realness(result.obj, message, ulist, post_params)
+        if (post_text.success):
+            post_params['text'] = post_text.obj
+            send_message(post_params)
+        
 def not_real(text, message, ulist, post_params):
-    """Parses very real text command.  Calls text_change_realness() to subtract
-    realness.
-    :param str text: text after @rb command
-    :param Message message: message calling this command
-    :param UserList ulist: user list of User objects"""
-    if len(text.split('not real')[1]) == 0:
-        post_params['text'] = 'Nothing to add realness to.'
+    parser = Parser(text, message, ulist)
+    result = parser.whoToChange()
+    if (not result.success):
+        post_params['text'] = result.obj
         send_message(post_params)
-    if (message.attachments!= [] and message.attachments[0]['type'] == 'mentions'):
-        for i, id in enumerate(message.attachments[0]['user_ids']):
-            text = text.replace((message.text[message.attachments[0]['loci'][i][0] : message.attachments[0]['loci'][i][0]+message.attachments[0]['loci'][i][1]]).lower(),' '+id+' ')
-        nameslist = text.lower().split('not real')[1].split()
     else:
-        nameslist = text.lower().split('not real')[1].split()
-    text_change_realness(nameslist, ulist, message, 'subtract', post_params)
-
+        post_text = remove_realness(result.obj, message, ulist, post_params)
+        if (post_text.success):
+            post_params['text'] = post_text.obj
+            send_message(post_params)
 
 def shop(text, message, ulist, post_params):
     text = text[1].strip().split(' ')
