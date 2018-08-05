@@ -134,6 +134,8 @@ class User:
     def adjustRealness(self, message, reason, ulist, multiplier = 1):
         if (message.sender_id == self.user_id):
             return ReturnObject(False, "You can't adjust your own realness")
+        elif (multiplier > 3):
+            return ReturnObject(False, "You're limited to changing 3 realness at a time")
         elif (reason == 'add'):
             self.add_realness(multiplier)
             return ReturnObject(True)
@@ -515,41 +517,6 @@ def send_message(post_params):
     :param dict post_params: bot_id, text required"""
     requests.post("https://api.groupme.com/v3/bots/post", json = post_params)
 
-#changes realness in dictionary, updates
-def adjust_realness(target_id, ulist, message, reason, post_params, multiplier=1):
-    """Adds or subtracts realness from User. Calls add_realness() or
-    subtract_realness() of User and find methods of UserList and send_message().
-    Calls users_write().
-    :param str id: user id of user to modify
-    :param UserList ulist: user list of User objects
-    :param Message message: message object that calls this function
-    :param reason: type of adjust, add or subtract
-    :return bool: True if success, False if failure"""
-    person = ulist.find(target_id)
-
-    if target_id == message.sender_id:
-        post_params['text'] = 'You can\'t change your own realness.'
-        send_message(post_params)
-        return False
-    elif reason == 'add':
-        person.add_realness(multiplier)
-        return True
-    elif reason == 'subtract':
-        if person.protected > datetime.now():
-            post_params['text'] = 'Sorry, ' + person.nickname + ' is protected.'
-            send_message(post_params)
-            return False
-        elif person.thornmail > datetime.now():
-            ulist.find(message.sender_id).realness -= 1
-            post_params['text'] = 'Sorry, ' + person.nickname + ' is protected.'
-            send_message(post_params)
-            return False
-        else:
-            person.subtract_realness(multiplier)
-            return True
-    users_write(ulist)
-    return True
-
 #reads messages and creates message_list of Message objects
 def read_messages(request_params, group_id, ulist, post_params, auth, timerlist, red):
     """Reads in messages from GroupMe API through requests.get().
@@ -783,14 +750,17 @@ def shop(text, message, ulist, post_params):
 def call_all(message, ulist, post_params, request_params, group_id):
     loci = []
     user_ids = []
+    if (('@all' not in message.text) and ('@everyone' not in message.text)):
+        return
     people = members(request_params, group_id)
     for i,person in enumerate(people):
         loci += [[i,i+1]]
         user_ids += [person['user_id']]
     post_params['attachments'] = [{'loci': loci, 'type':'mentions', 'user_ids':user_ids}]#[{'loci': [[0, 1], [2,1], [4,1], [6,1], [8,1], [10,1]], 'type':'mentions', 'user_ids': ulist.nicknames}]
-    post_params['text'] = "@everyone " + message.text.split('@all')[1].strip()
+    post_params['text'] = message.text
     send_message(post_params)
     post_params['attachments'] = []
+    return True
 
 
 def play(ulist, user_id, user_name, user2_id = '', user2_name = '', print_type = 'phone'):
@@ -879,8 +849,8 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
         return
     elif message.text.lower().startswith('here'):
         timerlist.cancel_timer(message.user_id, post_params)
-    elif (message.text.lower().startswith("@all") or message.text.lower().startswith("@everyone")):
-        call_all(message, ulist, post_params, request_params, group_id)
+    elif call_all(message, ulist, post_params, request_params, group_id):
+        return
     elif (message.text.lower().strip() == '@rb'):
         helper_main(post_params)
     elif (message.text.lower().startswith('@rb ')):
