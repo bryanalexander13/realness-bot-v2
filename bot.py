@@ -139,7 +139,7 @@ class User:
             return ReturnObject(False, "You're limited to changing 3 realness at a time")
         elif (reason == 'add'):
             self.add_realness(multiplier)
-            return ReturnObject(True)
+            return ReturnObject(True, multiplier)
         else:
             if self.protected > datetime.now():
                 return ReturnObject(False, 'Sorry, ' + self.nickname + ' is protected.')
@@ -148,7 +148,7 @@ class User:
                 return ReturnObject(False, 'Sorry, ' + self.nickname + ' is protected.')
             else:
                 self.subtract_realness(multiplier)
-                return ReturnObject(True)
+                return ReturnObject(True, multiplier)
 
 
 
@@ -170,7 +170,7 @@ class UserList:
         self.ids = {i.user_id:i for i in self.ulist}
         self.names = {i.name:i for i in self.ulist}
         self.nicknames = {i.nickname:i for i in self.ulist}
-        self.realnesses = {i.realness:i for i in self.ulist}
+        self.realnesses = {i.user_id:i.realness for i in self.ulist}
         self.peopleFinders = [self.find, self.findByName, self.findByNickname]
 
     def find(self, user_id):
@@ -197,12 +197,6 @@ class UserList:
             if (person.name != 'invalid'):
                 return ReturnObject(True, person)
         return ReturnObject(False)
-
-    def findByRealness(self, realness):
-        try:
-            return self.realnesses[realness]
-        except:
-            return User("0", "invalid", "invalid")
 
     def add(self, user):
         self.ulist += [user]
@@ -325,6 +319,58 @@ class TimerList:
             send_message(post_params)
 
 
+class Recorder:
+    def __init__(self, group_id, ulist, realness_stat = '', word_dict = ''):
+        self.group_id = group_id
+        self.ulist = ulist
+        if (word_dict == ''):
+            self.read_dict()
+        else:
+            self.word_dict = word_dict
+        if (realness_stat == ''):
+            self.read_realness()
+        else:
+            self.realness_stat = realness_stat
+    
+    def realness(self):
+        self.realness_stat[str(datetime.now())] = self.ulist.realnesses
+        self.record_realness()
+        
+    def record_realness(self):
+        with open(os.path.abspath('realness_stat.json'),'w') as s:
+            s.write(json.dumps(self.realness_stat))
+            s.close()
+            
+    def read_realness(self):
+        try:
+            with open(os.path.abspath('realness_stat.json'),'r') as s:
+                file = s.readlines()
+                self.realness_stat = json.loads(file[0])
+                s.close()
+        except:
+            self.realness_stat = {}
+    
+    def add(self, user_id, text):
+        try:
+            self.word_dict[user_id][str(datetime.now())] = text
+            self.record_dict()
+        except:
+            self.word_dict[user_id] = {str(datetime.now()) : text}
+            self.record_dict()
+            
+    def record_dict(self):
+        with open(os.path.abspath('word_'+self.group_id+'.json'),'w') as s:
+            s.write(json.dumps(self.word_dict))
+            s.close()
+            
+    def read_dict(self):
+        try:
+            with open(os.path.abspath('word_'+self.group_id+'.json'),'r') as s:
+                file = s.readlines()
+                self.word_dict = json.loads(file[0])
+                s.close()
+        except:
+            self.word_dict = {}
 
 class Message:
     """A message handler"""
@@ -498,25 +544,24 @@ def idea_write(idea):
         f.close()
 
 def stat_write(stat):
-    with open(os.path.abspath('users2.json'),'a') as s:
-        s.write(str(stat) + '\n')
+    with open(os.path.abspath('stat.txt'),'a') as s:
+        s.write(stat + '|||')
         s.close()
 
-def update_everyone(request_params, group_id, ulist, auth):
+def update_everyone(request_params, group_id, ulist):
     try:
         group = requests.get('https://api.groupme.com/v3/groups/' +group_id, params = request_params).json()['response']
     except:
         time.sleep(5)
-        update_everyone(request_params, group_id, ulist, auth)
+        update_everyone(request_params, group_id, ulist)
         return
-    
-    if group['id'] == auth['equipo']['group_id']:
-        for member in group['members']:
-            user = ulist.find(member['user_id'])
-            if user.name == 'invalid':
-                ulist.add(User(member['user_id'], member['nickname'], member['nickname']))
-            else:
-                user.nickname = member['nickname']
+
+    for member in group['members']:
+        user = ulist.find(member['user_id'])
+        if user.name == 'invalid':
+            ulist.add(User(member['user_id'], member['nickname'], member['nickname']))
+        else:
+            user.nickname = member['nickname']
 
 def members(request_params, group_id):
     group = requests.get('https://api.groupme.com/v3/groups/' + group_id, params = request_params).json()['response']
@@ -528,7 +573,7 @@ def send_message(post_params):
     requests.post("https://api.groupme.com/v3/bots/post", json = post_params)
 
 #reads messages and creates message_list of Message objects
-def read_messages(request_params, group_id, ulist, post_params, auth, timerlist, red):
+def read_messages(request_params, group_id, ulist, post_params, timerlist, red, word_dict, testmode):
     """Reads in messages from GroupMe API through requests.get().
     Converts messages into Message objects. Filters system and bot messages.
     Updates ulist with update method of UserList.  Calls commands().  Calls
@@ -567,9 +612,13 @@ def read_messages(request_params, group_id, ulist, post_params, auth, timerlist,
         if mess.sender_type == 'bot' or mess.sender_type == 'system':
             continue
         else:
-            update_everyone(request_params, group_id, ulist, auth)
+            if not testmode:
+                update_everyone(request_params, group_id, ulist)
             commands(mess, ulist, post_params, timerlist, request_params, group_id, red)
-            users_write(ulist)
+            if not testmode:
+                users_write(ulist)
+                word_dict.add(mess.sender_id, mess.text)
+                word_dict.realness()
             
     if len(message_list) > 0:
         last_write(message_list[0].id)
@@ -669,12 +718,12 @@ def helper_specific(post_params, text):
 def remove_realness(change_dict, message, ulist, post_params):
     text = 'Not Real. '
     for user in change_dict.keys():
-        result = user.adjustRealness(message, 'add', ulist, change_dict[user])
+        result = user.adjustRealness(message, 'subtract', ulist, change_dict[user])
         if (not result.success):
             post_params['text'] = result.obj
             send_message(post_params)
         else:
-            text += user.name.capitalize() + '. '
+            text += user.name.capitalize() + ' ' + str(result.obj) + '. '
     if (text != 'Not Real. '):
         return ReturnObject(True, text)
     else:
@@ -688,7 +737,7 @@ def add_realness(change_dict, message, ulist, post_params):
             post_params['text'] = result.obj
             send_message(post_params)
         else:
-            text += user.name.capitalize() + '. '
+            text += user.name.capitalize() + ' ' + str(result.obj) + '. '
     if (text != 'Very Real. '):
         return ReturnObject(True, text)
     else:
@@ -973,21 +1022,24 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
                 helper_main(post_params)
 
 
-def run(request_params, post_params, timerlist, group_id, userlist, auth, red):
+def run(request_params, post_params, timerlist, group_id, userlist, red, word_dict, testmode):
     while (1 == True):
-        read_messages(request_params, group_id, userlist, post_params, auth, timerlist, red)
+        read_messages(request_params, group_id, userlist, post_params, timerlist, red, word_dict, testmode)
 
         timerlist.check(post_params)
 
         time.sleep(1)
 
-def startup():
+def startup(testmode = False):
     user_dict = users_load()
     userlist = UserList(user_dict)
     red = Reddit()
     auth = auth_load()
     bot = auth['equipo']
+    if testmode:
+        bot = auth['test']
     group_id = bot['group_id']
+    word_dict = Recorder(group_id, userlist)
     request_params = {'token':auth['token']}
     post_params = {'text':'','bot_id':bot['bot_id'],'attachments':[]}
     timerlist = TimerList()
@@ -995,9 +1047,9 @@ def startup():
     for user in sorted(userlist.ulist, key=lambda x: x.realness):
         text += user.nickname +': ' + str(user.realness) + '\n'
     print(text)
-    run(request_params, post_params, timerlist, group_id, userlist, auth, red)
+    run(request_params, post_params, timerlist, group_id, userlist, red, word_dict, testmode)
 
 
 if __name__ == "__main__":
 
-    startup()
+    startup(True)
