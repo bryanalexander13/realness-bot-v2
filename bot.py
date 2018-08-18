@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 import play4
 import random
 from reddit_bot import Reddit
+import string
+from collections import defaultdict
 
 class User:
     """Users information"""
@@ -319,6 +321,39 @@ class TimerList:
             send_message(post_params)
 
 
+class StatEvaluator:
+    def __init__(self, group_id):
+        self.group_id = group_id
+        self.word_dict = self.readDict()
+        self.person_stats = defaultdict(lambda: defaultdict(int))
+        self.total_stats = defaultdict(int)
+        
+    def readDict(self):
+        try:
+            with open(os.path.abspath('word_'+self.group_id+'.json'),'r') as s:
+                file = s.readlines()
+                word_dict = json.loads(file[0])
+                s.close()
+            return word_dict
+        except:
+            return {}
+            
+    def evaluate(self, ulist):
+        for user in ulist.ulist:
+            messages = self.word_dict[user.user_id].values()
+            for ind, message in enumerate(messages):
+                try:
+                    message =  message.strip().lower().translate(''.maketrans("","",string.punctuation)).split()
+                
+                    for word in message:
+                        self.total_stats[word] += 1
+                        self.person_stats[user.user_id][word] += 1
+                except:
+                    continue
+                
+            print(max(self.person_stats[user.user_id]))
+            
+
 class Recorder:
     def __init__(self, group_id, ulist, realness_stat = '', word_dict = ''):
         self.group_id = group_id
@@ -371,6 +406,8 @@ class Recorder:
                 s.close()
         except:
             self.word_dict = {}
+            
+    
 
 class Message:
     """A message handler"""
@@ -1051,5 +1088,4 @@ def startup(testmode = False):
 
 
 if __name__ == "__main__":
-
-    startup(True)
+    startup()
