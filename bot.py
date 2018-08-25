@@ -463,6 +463,7 @@ class Parser():
         self.numbers = []
         self.totals = {}
         self.currentPersonToChange = None
+        self.max = 3
         
     def whoToChange(self):
         validate = self.valid_command()
@@ -470,6 +471,7 @@ class Parser():
             return validate
         if (self.message.attachments != []):
             self.removeMentions()
+        self.removeNonsense()
         return self.findPeopleAndAmounts()
     
     def valid_command(self):
@@ -493,6 +495,25 @@ class Parser():
             self.message.text = self.message.text[0:location[0]] + replacement + self.message.text[location[0] + location[1]:]
         self.text = self.message.text[4:].lower().strip()
         self.split = self.text.split(' ')[2:]
+        
+    def removeNonsense(self):
+        toDel = []
+        for ind, word in enumerate(self.split):
+            personResult = self.ulist.findPerson(word)
+            if personResult.success: continue
+            
+            digit = word.isdigit()
+            if digit: continue
+            
+            if self.split[ind:ind+2] == ["mad","realness"]:
+                self.split[ind] = "3"
+            elif word == "madrealness":
+                self.split[ind] = "3"
+            else:
+                toDel += [ind]
+            
+        for ind,i in enumerate(toDel):
+            del self.split[i - ind]
     
     def findPeopleAndAmounts(self):
         check = 'person'
@@ -508,7 +529,10 @@ class Parser():
                 if (not personResult.success):
                     return personResult
                 check = 'amount'
-            
+        
+        for key in self.totals:
+            self.totals[key] = min(self.totals[key],self.max)
+        
         return ReturnObject(True, self.totals)
             
     def addPersonToTotal(self, word):
@@ -628,7 +652,7 @@ def read_messages(request_params, group_id, ulist, post_params, timerlist, red, 
         response_messages = requests.get('https://api.groupme.com/v3/groups/{}/messages'.format(group_id), params = request_params).json()['response']['messages']
     except:
         print('connection problem')
-        time.sleep(10)
+        time.sleep(5)
         return
     message_list=[]
     last = last_load()
