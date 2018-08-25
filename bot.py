@@ -58,26 +58,26 @@ class User:
         if len(rest) == 2 and rest[1].isdigit():
             for ability in self.abilities:
                 if (rest[0] == ability.type and int(rest[1]) == ability.val):
-                    self.remove_ability(ability)
-                    exec(self.switch[ability.type])
-                    post_params['text'] = "Ability used"
-                    send_message(post_params)
+                    self.use(ability, post_params)
                     return
             post_params['text'] = "You don't have that ability"
             send_message(post_params)
         elif len(rest) >= 3 and rest[1].isdigit() and message.attachments != []:
             for ability in self.abilities:
                 if (rest[0] == ability.type and int(rest[1]) == ability.val):
-                    self.remove_ability(ability)
-                    exec(self.switch[ability.type])
-                    post_params['text'] = "Ability used"
-                    send_message(post_params)
+                    self.use(ability, post_params)
                     return
             post_params['text'] = "You don't have that ability"
             send_message(post_params)
         else:
             post_params['text'] = "I'm not sure what ability that is"
             send_message(post_params)
+    
+    def use(self, ability, post_params):
+        self.remove_ability(ability)
+        exec(self.switch[ability.type])
+        post_params['text'] = "Ability used"
+        send_message(post_params)
 
     def protect(self, time):
         self.protected = datetime.now() + timedelta(days = time)
@@ -108,6 +108,9 @@ class User:
                 post_params['text'] = "You got a " + ab.type + " " + str(ab.val)
                 send_message(post_params)
             self.reward = datetime.now()
+        else:
+            post_params['text'] = "Sorry, you already got your reward for today."
+            send_message(post_params)
                 
     def datetime_write(self, date):
         return date.strftime("%Y-%m-%d %H:%M:%S.%f")
@@ -134,7 +137,7 @@ class User:
             post_params['text'] = str(self.__dict__()[val])
             send_message(post_params)
             
-    def adjustRealness(self, message, reason, ulist, multiplier = 1):
+    def adjustRealness(self, message, reason, ulist, post_params, multiplier = 1):
         if (message.sender_id == self.user_id):
             return ReturnObject(False, "You can't adjust your own realness")
         elif (multiplier > 3):
@@ -143,6 +146,9 @@ class User:
             self.add_realness(multiplier)
             return ReturnObject(True, multiplier)
         else:
+            for ability in self.abilities:
+                if (ability.type in ["protect", "thornmail"]):
+                    self.use(ability, post_params)
             if self.protected > datetime.now():
                 return ReturnObject(False, 'Sorry, ' + self.nickname + ' is protected.')
             elif self.thornmail > datetime.now():
@@ -205,7 +211,6 @@ class UserList:
         self.ids[user.user_id] = user
         self.names[user.name] = user
         self.nicknames[user.nickname] = user
-        self.realnesses[user.realness] = user
 
     def remove(self, user_id):
         user = self.find(user_id)
@@ -255,7 +260,7 @@ class Timer:
             send_message(post_params)
             post_params['attachments'] = []
         else:
-            post_params['text'] = "@" + self.person.nickname + " You're Timer Is Up!"
+            post_params['text'] = "@" + self.person.nickname + " Your Timer Is Up!"
             post_params['attachments'] = [{'loci': [[0,len(self.person.nickname)]], 'type':'mentions', 'user_ids':[self.person.user_id]}]
             send_message(post_params)
             post_params['attachments'] = []
@@ -486,7 +491,7 @@ class Parser():
             replacement = person.name
             location = locations[ind]
             self.message.text = self.message.text[0:location[0]] + replacement + self.message.text[location[0] + location[1]:]
-        self.text = self.message.text[4:].lower()
+        self.text = self.message.text[4:].lower().strip()
         self.split = self.text.split(' ')[2:]
     
     def findPeopleAndAmounts(self):
@@ -755,7 +760,7 @@ def helper_specific(post_params, text):
 def remove_realness(change_dict, message, ulist, post_params):
     text = 'Not Real. '
     for user in change_dict.keys():
-        result = user.adjustRealness(message, 'subtract', ulist, change_dict[user])
+        result = user.adjustRealness(message, 'subtract', ulist, post_params, change_dict[user])
         if (not result.success):
             post_params['text'] = result.obj
             send_message(post_params)
@@ -769,7 +774,7 @@ def remove_realness(change_dict, message, ulist, post_params):
 def add_realness(change_dict, message, ulist, post_params):
     text = 'Very Real. '
     for user in change_dict.keys():
-        result = user.adjustRealness(message, 'add', ulist, change_dict[user])
+        result = user.adjustRealness(message, 'add', ulist, post_params, change_dict[user])
         if (not result.success):
             post_params['text'] = result.obj
             send_message(post_params)
@@ -1063,7 +1068,7 @@ def run(request_params, post_params, timerlist, group_id, userlist, red, word_di
     while (1 == True):
         read_messages(request_params, group_id, userlist, post_params, timerlist, red, word_dict, testmode)
 
-        timerlist.check(post_params)
+        timerlist.check(post_params)    
 
         time.sleep(1)
 
@@ -1088,4 +1093,4 @@ def startup(testmode = False):
 
 
 if __name__ == "__main__":
-    startup()
+    startup(True)
