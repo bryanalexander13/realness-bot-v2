@@ -1006,26 +1006,39 @@ def red_pill(post_params, red):
     else:
         send_message(post_params)
         
-def games(ulist, text, sender_id, post_params, timerlist):
-        split = text.split(' ')
-        length = len(split)
-        if  length > 2 or (length == 2 and not split[1].isdigit()):
-            post_params['text'] = "The games command takes a number for how many minutes to wait for people." + "ex. @rb games 60"
-            send_message(post_params)
-            return
-        elif length == 1:
-            for user in ulist.ulist:
-                if (user.user_id == sender_id): continue
+def games(ulist, text, message, post_params, timerlist):
+    sender_id = message.sender_id
+    split = text.split(' ')
+    length = len(split)
+    if len(message.attachments) != 0 and message.attachments[0]['type'] == 'mentions':
+        people = message.attachments[0]['user_ids']
+        if not split[1].isdigit():
+            for user in people:
+                user = ulist.find(user)
                 timerlist.add(Timer(True, datetime.now() + timedelta(minutes= 60), user, True))
             post_params['text'] = "Games??? T minus 60 minutes"
-        elif length == 2:
-            for user in ulist.ulist:
-                if (user.user_id == sender_id): continue
+        else:
+            for user in people:
+                user = ulist.find(user)
                 timerlist.add(Timer(True, datetime.now() + timedelta(minutes= int(split[1])), user, True))
             post_params['text'] = "Games??? T minus " + split[1] + " minutes"
-        post_params['attachments'] = format_all(ulist)
+    elif  length > 2 or (length == 2 and not split[1].isdigit()):
+        post_params['text'] = "The games command takes a number for how many minutes to wait for people." + "ex. @rb games 60 or @rb games 60 @friendido @friendido2"
         send_message(post_params)
-        post_params['attachments'] = []
+        return
+    elif length == 1:
+        for user in ulist.ulist:
+            if (user.user_id == sender_id): continue
+            timerlist.add(Timer(True, datetime.now() + timedelta(minutes= 60), user, True))
+        post_params['text'] = "Games??? T minus 60 minutes"
+    elif length == 2:
+        for user in ulist.ulist:
+            if (user.user_id == sender_id): continue
+            timerlist.add(Timer(True, datetime.now() + timedelta(minutes= int(split[1])), user, True))
+        post_params['text'] = "Games??? T minus " + split[1] + " minutes"
+    post_params['attachments'] = format_all(ulist)
+    send_message(post_params)
+    post_params['attachments'] = []
         
 def games_reply(user_id, text, post_params, timerlist):
     if text.startswith("yes"):
@@ -1094,7 +1107,7 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
                 blue_pill(post_params, red)
                 
             elif (text.startswith('games')):
-                games(ulist, text, message.sender_id, post_params, timerlist)
+                games(ulist, text, message, post_params, timerlist)
 
             elif (text.startswith('use')):
                 rest = text.split('use')[1].strip().split(' ')
@@ -1113,7 +1126,7 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
                     else:
                         play(ulist, message.sender_id, message.name, '', '', 'phone')
                     return
-                elif (message.attachments[0] != [] and message.attachments[0]['type'] == 'mentions'):
+                elif (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
                     person = message.attachments[0]['user_ids']
                     if len(person) == 1:
                         if text.endswith('both'):
@@ -1180,4 +1193,4 @@ def startup(testmode = False):
 
 
 if __name__ == "__main__":
-    startup(True)
+    startup()
