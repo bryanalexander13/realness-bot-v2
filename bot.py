@@ -136,7 +136,7 @@ class User:
         else:
             post_params['text'] = str(self.__dict__()[val])
             send_message(post_params)
-            
+    
     def adjustRealness(self, message, reason, ulist, post_params, multiplier = 1):
         if (message.sender_id == self.user_id):
             return ReturnObject(False, "You can't adjust your own realness")
@@ -471,6 +471,18 @@ class Message:
         self.system = system
         self.text = text
         self.user_id = user_id
+        for item in self.attachments:
+            self.type = item['type']
+            if self.type == 'mentions':
+                self.user_ids = item['user_ids']
+                self.loci = item['loci']
+            elif self.type == 'image':
+                self.url = item['url']
+            elif self.type == 'poll':
+                self.poll_id = item['poll_id']
+            else:
+                return
+            
 
     def count_likes(self):
         return len(self.liked)
@@ -722,14 +734,23 @@ def read_messages(request_params, group_id, ulist, post_params, timerlist, red, 
 def helper_main(post_params):
     """Sends message of all commands.
     :param dict post_params: text, bot_id required"""
-    post_params['text'] = ("These are the following commands:\n" +
-                                      "not real [@mention]\n" +
-                                      "very real [@mention]\n" +
-                                      "timer [@mention] [time]\n" +
-                                      "shop [item] [time]\n" +
-                                      "use [ability] [time]\n" +
+    post_params['text'] = ("These are the following commands:\n" 
+                                      "not real [@mention]\n" 
+                                      "very real [@mention]\n" 
+                                      "timer [@mention] [time]\n" 
+                                      "shop [item] [time]\n" 
+                                      "games [@mention] [time]\n"
+                                      "use [ability] [time]\n" 
                                       "help [command]\n"
-                                      "[@mention] [stat]\n"+
+                                      "[@mention] [stat]\n"
+                                      "reward\n"
+                                      "toot\n"
+                                      "red_pill\n"
+                                      "blue_pill\n"
+                                      "meme\n"
+                                      "joke\n"
+                                      "play [@mention] [computer|phone|both]\n"
+                                      "@all|@everyone\n"
                                       "ranking")
     send_message(post_params)
 
@@ -743,70 +764,130 @@ def helper_specific(post_params, text):
         if (reason[0] == "not"):
             post_params['text'] = ("The not real command is used to shame a user for their lack of realness\n" +
                       "Example: @rb not real Carter")
-            send_message(post_params)
+            
         elif (reason[0] == "very"):
             post_params['text'] = ("The very real command is used to reward a user for their excess of realness\n" +
                       "Example: @rb very real Carter")
-            send_message(post_params)
+            
         elif (reason[0] == "ranking"):
             post_params['text'] = ("The ranking command shows how real everyone is\n" +
                       "Example: @rb ranking")
-            send_message(post_params)
+            
         elif (reason[0] == "timer"):
             post_params['text'] = ("Set a timer in minutes so people aren't late\n" +
                       "Example: @rb timer @LusciousBuck 10")
-            send_message(post_params)
+            
         elif (reason[0] == 'shop'):
             post_params['text'] = ("Shop for radical abilities dude\n" +
                       "Example: @rb shop protect 10")
-            send_message(post_params)
+            
         elif (reason[0] == 'use'):
-            post_params['text'] = ("Use you radical abilities dude\n" +
+            post_params['text'] = ("Use your radical abilities dude\n" +
                       "Example: @rb use protect 10")
-            send_message(post_params)
+            
+        elif (reason[0] == 'toot'):
+            post_params['text'] = ("Gives a random comment made by Carter on Reddit\n" +
+                      "Example: @rb toot")
+            
+        elif (reason[0] == 'meme'):
+            post_params['text'] = ("Gives a random meme from r/dankmemes\n" +
+                      "Example: @rb meme")
+            
+        elif (reason[0] == 'joke'):
+            post_params['text'] = ("Gives a random joke from r/jokes\n" +
+                      "Example: @rb joke")
+            
+        elif (reason[0] == 'blue_pill'):
+            post_params['text'] = ("Gives a random post from r/esist\n" +
+                      "Example: @rb blue_pill")
+            
+        elif (reason[0] == 'red_pill'):
+            post_params['text'] = ("Gives a random post from r/the_donald\n" +
+                      "Example: @rb red_pill")
+            
+        elif (reason[0] == 'games'):
+            post_params['text'] = ("Sets a timer that rewards and punishes people for playing games.\n" 
+                       "You can leave out the @mentions to send the message to everyone.\n"
+                       "You can also leave out the time and it will default to 60 minutes.\n"
+                       "Example: @rb games @friendido 100")
+            
+        elif (reason[0] == 'play'):
+            post_params['text'] = ("Play connect four against a bot or friend for 5rp.\n" 
+                       "To play against a bot, leave out the @mentions.\n"
+                       "There are 2 board displays: phone and computer.\n"
+                       "You can also say both to have both displays.\n"
+                       "Examples: @rb play @friendido phone\n"
+                       "@rb play")
+            
+        elif (reason[0] == 'reddit'):
+            post_params['text'] = ("There are 5 reddit commands:\n\n"
+                       "toot\n"
+                       "meme\n"
+                       "joke\n"
+                       "red_pill\n"
+                       "blue_pill\n")
+            
         elif (reason[0] == 'stats' or reason[0] == 'stat'):
-            post_params['text'] = ("There are six stats to lookup:\n" +
+            post_params['text'] = ("There are six stats to lookup:\n\n" +
                        "name\n" +
                        "nickname\n" +
                        "realness\n" +
                        "abilities\n" +
                        "protected")
-            send_message(post_params)
+            
+        elif (reason[0] == 'ability' or reason[0] == 'abilities'):
+            post_params['text'] = ("There are three abilities to lookup:\n\n" +
+                       "protect\n" +
+                       "thornmail\n" +
+                       "bomb")
+            
         elif (reason[0] == 'help'):
             post_params['text'] = ("The help command has 3 uses:\n\n" +
                       "help [command]: find info on how to call commands and what they do\n\n" +
                       "help shop [item]: find info on abilities in the shop\n\n" +
                       "help ability [ability]: find info on what abilities do")
-            send_message(post_params)
+            
         else:
             helper_main(post_params)
+            return
     elif (len(reason) == 2):
         if (reason[0] == 'shop'):
             if (reason[1] == 'protect'):
-                post_params['text'] = ("The protect ability is 10rp per hour")
-                send_message(post_params)
+                post_params['text'] = ("The protect ability is 10rp per day")
+            elif (reason[1] == 'thornmail'):
+                post_params['text'] = ("The thornmail ability is 15rp per day")
+            elif (reason[1] == 'bomb'):
+                post_params['text'] = ("The bomb ability is 10rp for 10 damage")
             else:
-                post_params['text'] = ("Sorry, that's not an ability for sale")
-                send_message(post_params)
+                post_params['text'] = ("Sorry, that's not an ability for sale"
+                           "Did you want protect, thornmail, or bomb?")
+                
         elif (reason[0] == 'ability'):
             if (reason[1] == 'protect'):
                 post_params['text'] = ("The protect ability protects you from losing rp")
-                send_message(post_params)
+            elif (reason[1] == 'thornmail'):
+                post_params['text'] = ("The thornmail ability protects you from losing rp and punishes the attacker")
+            elif (reason[1] == 'bomb'):
+                post_params['text'] = ("The bomb ability does massive damage to others")
             else:
-                post_params['text'] = ("Sorry, that's not an ability")
-                send_message(post_params)
+                post_params['text'] = ("Sorry, that's not an ability.\n"
+                           "Did you want protect, thornmail, or bomb?")
+                
         elif (reason[0] == 'very' and reason[1] == 'real'):
             post_params['text'] = ("The very real command is used to reward a user for their excess of realness\n" +
                       "Example: @rb very real Carter")
-            send_message(post_params)
+            
         elif (reason[0] == 'not' and reason[1] == 'real'):
             post_params['text'] = ("The not real command is used to shame a user for their lack of realness\n" +
                       "Example: @rb not real Carter")
-            send_message(post_params)
+            
         else:
             helper_main(post_params)
+            return
     else:
         helper_main(post_params)
+        return
+    send_message(post_params)
 
 
 def remove_realness(change_dict, message, ulist, post_params):
@@ -1012,7 +1093,7 @@ def games(ulist, text, message, post_params, timerlist):
     length = len(split)
     if len(message.attachments) != 0 and message.attachments[0]['type'] == 'mentions':
         people = message.attachments[0]['user_ids']
-        if not split[1].isdigit():
+        if not split[-1].isdigit():
             for user in people:
                 user = ulist.find(user)
                 timerlist.add(Timer(True, datetime.now() + timedelta(minutes= 60), user, True))
@@ -1020,10 +1101,10 @@ def games(ulist, text, message, post_params, timerlist):
         else:
             for user in people:
                 user = ulist.find(user)
-                timerlist.add(Timer(True, datetime.now() + timedelta(minutes= int(split[1])), user, True))
+                timerlist.add(Timer(True, datetime.now() + timedelta(minutes= int(split[-1])), user, True))
             post_params['text'] = "Games??? T minus " + split[1] + " minutes"
     elif  length > 2 or (length == 2 and not split[1].isdigit()):
-        post_params['text'] = "The games command takes a number for how many minutes to wait for people." + "ex. @rb games 60 or @rb games 60 @friendido @friendido2"
+        post_params['text'] = "The games command takes a number for how many minutes to wait for people." + "ex. @rb games 60 or @rb games @friendido @friendido2 60"
         send_message(post_params)
         return
     elif length == 1:
@@ -1048,10 +1129,10 @@ def games_reply(user_id, text, post_params, timerlist):
             
 #checks for last message and runs commands
 def commands(message, ulist, post_params, timerlist, request_params, group_id, red):
-    fixed_text = message.text.lower().strip()
     if message.text == None:
         return
-    elif fixed_text.startswith('here'):
+    fixed_text = message.text.lower().strip()
+    if fixed_text.startswith('here'):
         timerlist.cancel_timer(message.user_id, post_params)
     elif fixed_text.startswith('yes') or fixed_text.startswith('no'):
         games_reply(message.user_id, fixed_text, post_params, timerlist)
@@ -1193,4 +1274,4 @@ def startup(testmode = False):
 
 
 if __name__ == "__main__":
-    startup()
+    startup(True)
