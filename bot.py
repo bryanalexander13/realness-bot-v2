@@ -244,13 +244,13 @@ class UserList:
             return ReturnObject(False, "Sorry, only admins have this ability")
         
 
-
 class Timer:
 
-    def __init__(self, punishment, time, user):
+    def __init__(self, punishment, time, user, reward = False):
         self.punishment = punishment
         self.time = time
         self.person = user
+        self.reward = reward
 
     def explode(self, post_params):
         if self.punishment:
@@ -269,39 +269,66 @@ class Timer:
 class TimerList:
 
     def __init__(self, timers = []):
-        self.timerlist = timers
-        self.timerdict = {i.time:i for i in timers}
-        self.iddict = {i.person.user_id:i for i in timers}
+        self.timerlist = (timers + [Timer(False, datetime.now() + timedelta(days= 1000000), User("Invalid", "Invalid", "Invalid"))])
+        self.timerdict = {i.time:i for i in self.timerlist}
+        self.iddict = {i.person.user_id:i for i in self.timerlist}
+        self.min = min(self.timerlist)
 
     def add(self, timer):
         self.timerlist += [timer]
         self.timerdict[timer.time] = timer
         self.iddict[timer.person.user_id] = timer
+        self.min = min(self.timerdict)
 
-    def remove(self, timer):
+    def remove(self, timer, reward, explode):
         try:
+            if timer.reward:
+                if not reward:
+                    return False
+                if not explode:
+                    timer.person.add_realness()
             del self.timerdict[timer.time]
             del self.iddict[timer.person.user_id]
             self.timerlist.remove(timer)
+            self.min = min(self.timerdict)
             return True
         except:
             return False
 
     def upnext(self):
         try:
-            return self.timerdict[min(self.timerdict)]
+            return self.timerdict[self.min]
         except:
-            return Timer(False, datetime.now() + timedelta(days= 1), "Invalid")
+            return Timer(False, datetime.now() + timedelta(days= 1000000), "Invalid")
 
     def check(self, post_params):
         timer = self.upnext()
         if timer.time <= datetime.now():
             timer.explode(post_params)
-            self.remove(timer)
-
+            self.remove(timer, True, True)
+    
     def cancel_timer(self, user_id, post_params):
-        if self.remove(user_id):
+        try:
+            timer = self.iddict[user_id]
+        except:
+            return
+        if self.remove(timer, False, False):
             post_params['text'] = "Finally"
+            send_message(post_params)
+            
+    def games_answer(self, user_id, play, post_params):
+        try:
+            timer = self.iddict[user_id]
+        except:
+            return
+        if play:
+            if self.remove(timer, True, False):
+                post_params['text'] = "Let's Go"
+                send_message(post_params)
+        else:
+            timer.person.subtract_realness()
+            self.remove(timer, True, True)
+            post_params['text'] = "Not Real."
             send_message(post_params)
 
     def set_timer(self, text, message, ulist, post_params):
@@ -630,6 +657,7 @@ def update_everyone(request_params, group_id, ulist):
             user.nickname = member['nickname']
 
 def members(request_params, group_id):
+    "DEPRICATED"
     group = requests.get('https://api.groupme.com/v3/groups/' + group_id, params = request_params).json()['response']
     return group['members']
 
@@ -879,17 +907,19 @@ def shop(text, message, ulist, post_params):
         post_params['text'] = "I don't have that ability for sale... yet."
         send_message(post_params)
 
-
-def call_all(message, ulist, post_params, request_params, group_id):
+def format_all(ulist):
     loci = []
-    user_ids = []
-    if (('@all' not in message.text) and ('@everyone' not in message.text)):
-        return
-    people = members(request_params, group_id)
-    for i,person in enumerate(people):
+    user_ids = list(ulist.ids.keys())
+    for i,person in enumerate(user_ids):
         loci += [[i,i+1]]
-        user_ids += [person['user_id']]
-    post_params['attachments'] = [{'loci': loci, 'type':'mentions', 'user_ids':user_ids}]#[{'loci': [[0, 1], [2,1], [4,1], [6,1], [8,1], [10,1]], 'type':'mentions', 'user_ids': ulist.nicknames}]
+    return [{'loci': loci, 'type':'mentions', 'user_ids':user_ids}]
+
+def call_all(message, ulist, post_params):
+    
+    if (('@all' not in message.text) and ('@everyone' not in message.text)):
+        return False
+    
+    post_params['attachments'] = format_all(ulist)
     post_params['text'] = message.text
     send_message(post_params)
     post_params['attachments'] = []
@@ -976,17 +1006,47 @@ def red_pill(post_params, red):
     else:
         send_message(post_params)
         
+def games(ulist, text, sender_id, post_params, timerlist):
+        split = text.split(' ')
+        length = len(split)
+        if  length > 2 or (length == 2 and not split[1].isdigit()):
+            post_params['text'] = "The games command takes a number for how many minutes to wait for people." + "ex. @rb games 60"
+            send_message(post_params)
+            return
+        elif length == 1:
+            for user in ulist.ulist:
+                if (user.user_id == sender_id): continue
+                timerlist.add(Timer(True, datetime.now() + timedelta(minutes= 60), user, True))
+            post_params['text'] = "Games??? T minus 60 minutes"
+        elif length == 2:
+            for user in ulist.ulist:
+                if (user.user_id == sender_id): continue
+                timerlist.add(Timer(True, datetime.now() + timedelta(minutes= int(split[1])), user, True))
+            post_params['text'] = "Games??? T minus " + split[1] + " minutes"
+        post_params['attachments'] = format_all(ulist)
+        send_message(post_params)
+        post_params['attachments'] = []
+        
+def games_reply(user_id, text, post_params, timerlist):
+    if text.startswith("yes"):
+        timerlist.games_answer(user_id, True, post_params)
+    else:
+        timerlist.games_answer(user_id, False, post_params)
+            
 #checks for last message and runs commands
 def commands(message, ulist, post_params, timerlist, request_params, group_id, red):
+    fixed_text = message.text.lower().strip()
     if message.text == None:
         return
-    elif message.text.lower().startswith('here'):
+    elif fixed_text.startswith('here'):
         timerlist.cancel_timer(message.user_id, post_params)
-    elif call_all(message, ulist, post_params, request_params, group_id):
+    elif fixed_text.startswith('yes') or fixed_text.startswith('no'):
+        games_reply(message.user_id, fixed_text, post_params, timerlist)
+    elif call_all(message, ulist, post_params):
         return
-    elif (message.text.lower().strip() == '@rb'):
+    elif (fixed_text == '@rb'):
         helper_main(post_params)
-    elif (message.text.lower().startswith('@rb ')):
+    elif (fixed_text.startswith('@rb ')):
             text = message.text.split('@rb ')
 
             text = text[1].lower().strip()
@@ -1015,23 +1075,26 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
             elif (text.startswith('shop')):
                 shop((text.split('shop')), message, ulist, post_params)
                 
-            elif (text.startswith('joke')):
+            elif (text == 'joke'):
                 joke(post_params, red)
                 
-            elif (text.startswith('toot')):
+            elif (text == 'toot'):
                 toot(post_params, red)
                 
-            elif (text.startswith('meme')):
+            elif (text == 'meme'):
                 meme(post_params, red)
                 
-            elif (text.startswith('idea')):
+            elif (text == 'idea'):
                 idea(post_params, text)
             
-            elif (text.startswith('red pill')):
+            elif (text == 'red pill'):
                 red_pill(post_params, red)
                 
-            elif (text.startswith('blue pill')):
+            elif (text == 'blue pill'):
                 blue_pill(post_params, red)
+                
+            elif (text.startswith('games')):
+                games(ulist, text, message.sender_id, post_params, timerlist)
 
             elif (text.startswith('use')):
                 rest = text.split('use')[1].strip().split(' ')
