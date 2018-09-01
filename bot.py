@@ -11,7 +11,7 @@ from collections import defaultdict
 
 class User:
     """Users information"""
-    def __init__(self, user_id, name, nickname, realness = 0, abilities = [], protected = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"), thornmail = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"), reward = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S.%f"), permission = 'user'):
+    def __init__(self, user_id, name, nickname, realness = 0, abilities = [], protected = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"), thornmail = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"), reward = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S.%f"), permission = 'user', last = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S.%f")):
         self.user_id = user_id
         self.name = name
         self.nickname = nickname
@@ -20,10 +20,11 @@ class User:
         self.permission = permission
         self.protected = self.datetime_read(protected)
         self.thornmail = self.datetime_read(thornmail)
+        self.last = self.datetime_read(last)
         self.reward = self.datetime_read(reward)
         self.switch = {"protect" : "self.protect(ability.val)",
                        "thornmail" : "self.thornmailed(ability.val)",
-                       "bomb" : "self.bomb(person, ulist, message, ability.val, post_params)"}
+                       "bomb" : "self.bomb(person, ability.val)"}
         self.ability_read()
         self.properties = self.__dict__().keys()
 
@@ -36,7 +37,8 @@ class User:
                 "protected": self.datetime_write(self.protected),
                 "thornmail": self.datetime_write(self.thornmail),
                 "reward": self.datetime_write(self.reward),
-                "permission": self.permission}
+                "permission": self.permission,
+                "last": self.datetime_write(self.last)}
         
 
     def add_realness(self, multiplier=1):
@@ -62,21 +64,28 @@ class User:
                     return
             post_params['text'] = "You don't have that ability"
             send_message(post_params)
-        elif len(rest) >= 3 and rest[1].isdigit() and message.attachments != []:
+        elif len(rest) >= 3 and rest[1].isdigit():
             for ability in self.abilities:
                 if (rest[0] == ability.type and int(rest[1]) == ability.val):
-                    self.use(ability, post_params)
+                    parser = Parser(message.text, message, ulist)
+                    parser.removeMentions()
+                    self.use(ability, post_params, person = ulist.findPerson(parser.split[1]).obj)
                     return
             post_params['text'] = "You don't have that ability"
             send_message(post_params)
         else:
-            post_params['text'] = "I'm not sure what ability that is"
+            post_params['text'] = "I'm not sure what ability that is.\nTry: @rb protect #number or @rb bomb #number @person"
             send_message(post_params)
     
-    def use(self, ability, post_params):
-        self.remove_ability(ability)
+    def use(self, ability, post_params, person = ''):
+        if ability.type == 'bomb':
+            if person == None:
+                post_params['text'] = "That's not a person"
+                send_message(post_params)
+                return
         exec(self.switch[ability.type])
-        post_params['text'] = "Ability used"
+        self.remove_ability(ability)
+        post_params['text'] = ability.type + " used"
         send_message(post_params)
 
     def protect(self, time):
@@ -85,25 +94,25 @@ class User:
     def thornmailed(self, time):
         self.thornmail = datetime.now() + timedelta(days = time)
 
-    def bomb(self, person, ulist, message, power, post_params):
-        person.adjustRealness(ulist, message, "subtract", post_params, multiplier=10*power)
+    def bomb(self, person, power):
+        person.subtract_realness(multiplier=10*power)
 
     def daily_reward(self, post_params):
         if self.reward <= datetime.now() - timedelta(days=1):
             ran = random.randint(0,9)
-            if ran > 2:
-                rew = max(min(round(abs(random.gauss(5,5)-5)), 10), 1) 
+            if ran > 0:
+                rew = max(min(round(abs(random.gauss(0,4))), 10), 1) 
                 self.add_realness(rew)
                 post_params['text'] = "You got " + str(rew) + "rp"
                 send_message(post_params)
             else:
                 ran = random.randint(0,2)
                 if ran == 0:
-                    ab = Ability('protect', max(min(round(abs(random.gauss(3,1) -3)), 3), 1))
+                    ab = Ability('protect', max(min(round(abs(random.gauss(3,1))), 3), 1))
                 elif ran == 1:
-                    ab = Ability('thornmail', max(min(round(abs(random.gauss(3,1) -3)), 3), 1))
+                    ab = Ability('thornmail', max(min(round(abs(random.gauss(3,1))), 3), 1))
                 elif ran == 2:
-                    ab = Ability('bomb', max(min(round(abs(random.gauss(3,1) -3)), 3), 1))
+                    ab = Ability('bomb', max(min(round(abs(random.gauss(3,1))), 3), 1))
                 self.add_ability(ab)
                 post_params['text'] = "You got a " + ab.type + " " + str(ab.val)
                 send_message(post_params)
@@ -146,15 +155,16 @@ class User:
             self.add_realness(multiplier)
             return ReturnObject(True, multiplier)
         else:
-            for ability in self.abilities:
-                if (ability.type in ["protect", "thornmail"]):
-                    self.use(ability, post_params)
-            if self.protected > datetime.now():
-                return ReturnObject(False, 'Sorry, ' + self.nickname + ' is protected.')
-            elif self.thornmail > datetime.now():
+            if self.thornmail > datetime.now():
                 ulist.find(message.sender_id).realness -= multiplier
                 return ReturnObject(False, 'Sorry, ' + self.nickname + ' is protected.')
+            elif self.protected > datetime.now():
+                return ReturnObject(False, 'Sorry, ' + self.nickname + ' is protected.')
             else:
+                for ability in self.abilities:
+                    if (ability.type in ["protect", "thornmail"]):
+                        self.use(ability, post_params)
+                        return self.adjustRealness(message, reason, ulist, post_params, multiplier)
                 self.subtract_realness(multiplier)
                 return ReturnObject(True, multiplier)
 
@@ -169,10 +179,10 @@ class Ability:
 class UserList:
     def __init__(self, udict):
         try:
-            self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected'], i['thornmail'], i['reward'], i['permission']) for i in udict]
+            self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected'], i['thornmail'], i['reward'], i['permission'], i['last']) for i in udict]
         except:
             try:
-                self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected'], i['thornmail'], i['reward']) for i in udict]
+                self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected'], i['thornmail'], i['reward'], i['permission']) for i in udict]
             except:
                 self.ulist = [User(i['user_id'], i["name"], i['nickname']) for i in udict]
         self.ids = {i.user_id:i for i in self.ulist}
@@ -359,6 +369,7 @@ class StatEvaluator:
         self.word_dict = self.readDict()
         self.person_stats = defaultdict(lambda: defaultdict(int))
         self.total_stats = defaultdict(int)
+        self.common = self.readCommon()
         
     def readDict(self):
         try:
@@ -369,6 +380,13 @@ class StatEvaluator:
             return word_dict
         except:
             return {}
+    
+    def readCommon(self):
+        with open(os.path.abspath('common.txt'),'r') as s:
+            file = s.readlines()
+            word_dict = [word.strip('\n').lower().translate(''.maketrans("","",string.punctuation)) for word in file]
+            s.close()
+        return word_dict
             
     def evaluate(self, ulist):
         for user in ulist.ulist:
@@ -382,8 +400,40 @@ class StatEvaluator:
                         self.person_stats[user.user_id][word] += 1
                 except:
                     continue
-                
-            print(max(self.person_stats[user.user_id]))
+    
+    def mostCommonWordForEachPerson(self, ulist):
+        out = []
+        for user in ulist.ulist:
+            person_dict = self.person_stats[user.user_id]
+            max_val = sorted(zip(person_dict.values(), person_dict.keys()))[::-1]         
+            for item in max_val:
+                if item[1] in self.common: continue
+                out += [(user.nickname, item)]
+                break
+        return out
+    
+    def mostCommonWordForPerson(self, user, top):
+        out = []
+        person_dict = self.person_stats[user.user_id]
+        max_val = sorted(zip(person_dict.values(), person_dict.keys()))[::-1]         
+        for item in max_val:
+            if top <= 0:
+                break
+            if item[1] in self.common: continue
+            out += [item]    
+            top -= 1
+        return [(user.nickname, out)]
+    
+    def mostCommonWordForAll(self, top):
+        out = []
+        max_val = sorted(zip(self.total_stats.values(), self.total_stats.keys()))[::-1]
+        for item in max_val:
+            if top <= 0:
+                break
+            if item[1] in self.common: continue
+            out += [item]    
+            top -= 1
+        return out
             
 
 class Recorder:
@@ -432,7 +482,7 @@ class Recorder:
             
     def read_dict(self):
         try:
-            with open(os.path.abspath('word_'+self.group_id+'.json'),'r') as s:
+            with open(os.path.abspath('word_'+self.group_id+'.json'),'r', encoding='utf8', errors='ignore') as s:
                 file = s.readlines()
                 self.word_dict = json.loads(file[0])
                 s.close()
@@ -471,6 +521,11 @@ class Message:
         self.system = system
         self.text = text
         self.user_id = user_id
+        self.type = None
+        self.user_ids = None
+        self.loci = None
+        self.url = None
+        self.poll_id = None
         for item in self.attachments:
             self.type = item['type']
             if self.type == 'mentions':
@@ -525,6 +580,10 @@ class Parser():
                 return ReturnObject(True)      
     
     def removeMentions(self):
+        if self.message.attachments == [] or self.message.type != 'mentions':
+            self.text = self.message.text[3:].lower().strip()
+            self.split = self.text.split(' ')[2:]
+            return
         user_ids = self.message.attachments[0]['user_ids'][::-1]
         locations = self.message.attachments[0]['loci'][::-1]
         for ind, user in enumerate(user_ids):
@@ -532,9 +591,23 @@ class Parser():
             replacement = person.name
             location = locations[ind]
             self.message.text = self.message.text[0:location[0]] + replacement + self.message.text[location[0] + location[1]:]
-        self.text = self.message.text[4:].lower().strip()
+        self.text = self.message.text[3:].lower().strip()
         self.split = self.text.split(' ')[2:]
         
+    def formatForRecorder(self):
+        if self.message.type == 'mentions':
+            user_ids = self.message.attachments[0]['user_ids'][::-1]
+            locations = self.message.attachments[0]['loci'][::-1]
+            for ind, user in enumerate(user_ids):
+                person = self.ulist.find(user)
+                replacement = person.name
+                location = locations[ind]
+                self.message.text = self.message.text[0:location[0]] + replacement + self.message.text[location[0] + location[1]:]
+        if len(self.message.text) > 3 and self.message.text[:3] == '@rb':
+            self.text = self.message.text[3:].lower().strip()
+        else:
+            self.text = self.message.text.lower().strip()
+       
     def removeNonsense(self):
         toDel = []
         for ind, word in enumerate(self.split):
@@ -721,9 +794,11 @@ def read_messages(request_params, group_id, ulist, post_params, timerlist, red, 
             if not testmode:
                 update_everyone(request_params, group_id, ulist)
             commands(mess, ulist, post_params, timerlist, request_params, group_id, red)
-            if not testmode:
+            if not testmode and mess.text is not None:
                 users_write(ulist)
-                word_dict.add(mess.sender_id, mess.text)
+                parser = Parser(mess.text, mess, ulist)
+                parser.formatForRecorder()
+                word_dict.add(mess.sender_id, parser.text)
                 word_dict.realness()
             
     if len(message_list) > 0:
@@ -731,27 +806,36 @@ def read_messages(request_params, group_id, ulist, post_params, timerlist, red, 
 
 
 
-def helper_main(post_params):
+def helper_main(post_params, page = 1):
     """Sends message of all commands.
     :param dict post_params: text, bot_id required"""
-    post_params['text'] = ("These are the following commands:\n" 
-                                      "not real [@mention]\n" 
-                                      "very real [@mention]\n" 
-                                      "timer [@mention] [time]\n" 
-                                      "shop [item] [time]\n" 
-                                      "games [@mention] [time]\n"
-                                      "use [ability] [time]\n" 
-                                      "help [command]\n"
-                                      "[@mention] [stat]\n"
-                                      "reward\n"
-                                      "toot\n"
-                                      "red_pill\n"
-                                      "blue_pill\n"
-                                      "meme\n"
-                                      "joke\n"
-                                      "play [@mention] [computer|phone|both]\n"
-                                      "@all|@everyone\n"
-                                      "ranking")
+    header = "These are the following commands:\n"
+    pages = [
+            ("not real [@mention]\n" 
+              "very real [@mention]\n" 
+              "help [#page|command]\n"
+              "timer [@mention] [time]\n"               
+              "@all|@everyone\n"),
+    
+            ("shop [item] [time]\n" 
+             "use [ability] [time] [@mention]\n"
+             "reward\n"
+             "games [@mention] [time]\n"
+             "[@mention] [stat]\n"
+             "play [@mention] [computer|phone|both]\n"),
+
+             ("ranking\n"
+              "toot\n"
+              "red pill\n"
+              "blue pill\n"
+              "meme\n"
+              "joke\n")
+            ]
+    max_page = len(pages)
+    page = (page - 1)%max_page
+    tail = "page " + str(page + 1) + "/" + str(max_page)
+    
+    post_params['text'] = header + pages[page] + tail
     send_message(post_params)
 
 
@@ -797,11 +881,11 @@ def helper_specific(post_params, text):
             post_params['text'] = ("Gives a random joke from r/jokes\n" +
                       "Example: @rb joke")
             
-        elif (reason[0] == 'blue_pill'):
+        elif (reason[0] == 'bluepill' or reason[0] == 'blue_pill'):
             post_params['text'] = ("Gives a random post from r/esist\n" +
                       "Example: @rb blue_pill")
             
-        elif (reason[0] == 'red_pill'):
+        elif (reason[0] == 'redpill' or reason[0] == 'red_pill'):
             post_params['text'] = ("Gives a random post from r/the_donald\n" +
                       "Example: @rb red_pill")
             
@@ -846,7 +930,9 @@ def helper_specific(post_params, text):
                       "help [command]: find info on how to call commands and what they do\n\n" +
                       "help shop [item]: find info on abilities in the shop\n\n" +
                       "help ability [ability]: find info on what abilities do")
-            
+        elif (reason[0].isdigit()):
+            helper_main(post_params, int(reason[0]))
+            return
         else:
             helper_main(post_params)
             return
@@ -881,6 +967,13 @@ def helper_specific(post_params, text):
             post_params['text'] = ("The not real command is used to shame a user for their lack of realness\n" +
                       "Example: @rb not real Carter")
             
+        elif (reason[0] == 'red' and reason[1] == 'pill'):
+            post_params['text'] = ("Gives a random post from r/the_donald\n" +
+                      "Example: @rb red pill")
+            
+        elif (reason[0] == 'blue' or reason[0] == 'pill'):
+            post_params['text'] = ("Gives a random post from r/esist\n" +
+                      "Example: @rb blue pill")
         else:
             helper_main(post_params)
             return
@@ -919,6 +1012,9 @@ def add_realness(change_dict, message, ulist, post_params):
         return ReturnObject(False)
 
 def very_real(text, message, ulist, post_params):
+    person = ulist.find(message.sender_id)
+    if person.last > (datetime.now() - timedelta(minutes=15)):
+        post_params['text'] = "Sorry, you can only use this once every 15 minutes"
     parser = Parser(text, message, ulist)
     result = parser.whoToChange()
     if (not result.success):
@@ -929,8 +1025,14 @@ def very_real(text, message, ulist, post_params):
         if (post_text.success):
             post_params['text'] = post_text.obj
             send_message(post_params)
+    person.last = datetime.now()
         
 def not_real(text, message, ulist, post_params):
+    person = ulist.find(message.sender_id)
+    if person.last > (datetime.now() - timedelta(minutes=15)):
+        post_params['text'] = "Sorry, you can only use this once every 15 minutes"
+        send_message(post_params)
+        return
     parser = Parser(text, message, ulist)
     result = parser.whoToChange()
     if (not result.success):
@@ -941,6 +1043,7 @@ def not_real(text, message, ulist, post_params):
         if (post_text.success):
             post_params['text'] = post_text.obj
             send_message(post_params)
+    person.last = datetime.now()
 
 def clear(ulist, sender_id, post_params):
     result = ulist.clearRealness(sender_id)
@@ -1013,12 +1116,9 @@ def play(ulist, user_id, user_name, user2_id = '', user2_name = '', print_type =
         ulist.find(user_id).add_realness(5)
     elif outcome == "win1":
         ulist.find(user_id).add_realness(5)
-        ulist.find(user2_id).subtract_realness(5)
     elif outcome == "win2":
         ulist.find(user2_id).add_realness(5)
-        ulist.find(user_id).subtract_realness(5)
         
-
 def joke(post_params, red):
     try:
         text = red.joke()
@@ -1127,6 +1227,38 @@ def games_reply(user_id, text, post_params, timerlist):
     else:
         timerlist.games_answer(user_id, False, post_params)
             
+def evaluate(post_params, text, message, ulist, group_id):
+    split = text.split(' ')
+    if len(split) == 1:
+        evaluator = StatEvaluator(group_id)
+        evaluator.evaluate(ulist)
+        word_list = evaluator.mostCommonWordForEachPerson(ulist)
+        post_params['text'] = ''
+        for word in word_list:
+            post_params['text'] += word[0] + ": " + word[1][1] + "\n"
+        send_message(post_params)
+    elif (message.attachments != [] and message.type == 'mentions'):
+        evaluator = StatEvaluator(group_id)
+        evaluator.evaluate(ulist)
+        word_list = []
+        for user_id in message.user_ids:
+            user = ulist.find(user_id)
+            word_list += evaluator.mostCommonWordForPerson(user, 10)
+        post_params['text'] = ''
+        for word in word_list:
+            post_params['text'] += word[0] + ":\n" 
+            for tup in word[1]:
+                post_params['text'] += tup[1] + '  ' + str(tup[0]) + "\n"
+        send_message(post_params)
+    elif (len(split) == 2 and split[1].isdigit()):
+        evaluator = StatEvaluator(group_id)
+        evaluator.evaluate(ulist)
+        word_list = evaluator.mostCommonWordForAll(int(split[1]))
+        post_params['text'] = ''
+        for word in word_list:
+            post_params['text'] += word[1] + "  " + str(word[0])  +  "\n"
+        send_message(post_params)
+        
 #checks for last message and runs commands
 def commands(message, ulist, post_params, timerlist, request_params, group_id, red):
     if message.text == None:
@@ -1181,15 +1313,18 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
             elif (text == 'idea'):
                 idea(post_params, text)
             
-            elif (text == 'red pill'):
+            elif (text in ['red pill', 'redpill', 'red_pill']):
                 red_pill(post_params, red)
                 
-            elif (text == 'blue pill'):
+            elif (text in ['blue pill', 'bluepill', 'blue_pill']):
                 blue_pill(post_params, red)
                 
             elif (text.startswith('games')):
                 games(ulist, text, message, post_params, timerlist)
-
+            
+            elif (text.startswith('word')):
+                evaluate(post_params, text, message, ulist, group_id)
+            
             elif (text.startswith('use')):
                 rest = text.split('use')[1].strip().split(' ')
                 ulist.find(message.sender_id).use_ability(rest, ulist, message, post_params)
@@ -1247,11 +1382,14 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
 
 def run(request_params, post_params, timerlist, group_id, userlist, red, word_dict, testmode):
     while (1 == True):
+#        try:
         read_messages(request_params, group_id, userlist, post_params, timerlist, red, word_dict, testmode)
 
         timerlist.check(post_params)    
 
         time.sleep(1)
+#        except Exception as e:
+#            print(e)
 
 def startup(testmode = False):
     user_dict = users_load()
