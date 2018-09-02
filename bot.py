@@ -122,7 +122,8 @@ class User:
                 send_message(post_params)
             self.reward = datetime.now()
         else:
-            post_params['text'] = "Sorry, you already got your reward for today."
+            timeleft = str((self.reward + timedelta(days=1)) - datetime.now()).split('.')[0].split(':')
+            post_params['text'] = "Sorry, you already gotten your reward for today. " + timeleft[0] + "h " + timeleft[1] + "m " + timeleft[2] + "s left."
             send_message(post_params)
                 
     def datetime_write(self, date):
@@ -1572,4 +1573,4 @@ def startup(testmode = False, shouldrun = True):
 
 
 if __name__ == "__main__":
-    startup()
+    startup(True)
