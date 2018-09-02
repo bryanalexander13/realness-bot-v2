@@ -146,8 +146,8 @@ class User:
             post_params['text'] = str(self.__dict__()[val])
             send_message(post_params)
     
-    def adjustRealness(self, message, reason, ulist, post_params, multiplier = 1):
-        if (message.sender_id == self.user_id):
+    def adjustRealness(self, form, reason, post_params, multiplier = 1):
+        if (form.message.sender_id == self.user_id):
             return ReturnObject(False, "You can't adjust your own realness")
         elif (multiplier > 3):
             return ReturnObject(False, "You're limited to changing 3 realness at a time")
@@ -156,7 +156,7 @@ class User:
             return ReturnObject(True, multiplier)
         else:
             if self.thornmail > datetime.now():
-                ulist.find(message.sender_id).realness -= multiplier
+                form.ulist.find(form.message.sender_id).realness -= multiplier
                 return ReturnObject(False, 'Sorry, ' + self.nickname + ' is protected.')
             elif self.protected > datetime.now():
                 return ReturnObject(False, 'Sorry, ' + self.nickname + ' is protected.')
@@ -164,7 +164,7 @@ class User:
                 for ability in self.abilities:
                     if (ability.type in ["protect", "thornmail"]):
                         self.use(ability, post_params)
-                        return self.adjustRealness(message, reason, ulist, post_params, multiplier)
+                        return self.adjustRealness(form, reason, post_params, multiplier)
                 self.subtract_realness(multiplier)
                 return ReturnObject(True, multiplier)
 
@@ -549,10 +549,10 @@ class ReturnObject:
 
 
 class Parser():
-    def __init__(self, text, message, ulist):
-        self.text = text
-        self.message = message
-        self.ulist = ulist
+    def __init__(self, form):
+        self.text = form.text
+        self.message = form.message
+        self.ulist = form.ulist
         self.split = []
         self.numbers = []
         self.totals = {}
@@ -563,8 +563,6 @@ class Parser():
         validate = self.valid_command()
         if (not validate.success):
             return validate
-        if (self.message.attachments != []):
-            self.removeMentions()
         self.removeNonsense()
         return self.findPeopleAndAmounts()
     
@@ -580,7 +578,7 @@ class Parser():
                 return ReturnObject(True)      
     
     def removeMentions(self):
-        if self.message.attachments == [] or self.message.type != 'mentions':
+        if self.message.type != 'mentions':
             self.text = self.message.text[3:].lower().strip()
             self.split = self.text.split(' ')[2:]
             return
@@ -668,7 +666,51 @@ class Parser():
             return ReturnObject(True)
         else:
             return ReturnObject(False, "Invalid Amount(s)")
-                
+         
+class Formatter:
+    def __init__(self, message, ulist):
+        self.message = message
+        self.text = message.text.lower().strip()
+        self.ulist = ulist
+        self.people = []
+    
+    def replaceMentions(self):
+        if self.message.type != 'mentions':
+            return
+        mentions = sorted(zip( self.message.loci, self.message.user_ids))[::-1]
+        mentions = self.removeDuplicates(mentions)
+        for mention in mentions:
+            person = self.ulist.find(mention[1])
+            replacement = person.name
+            location = mention[0]
+            self.text = self.text[0:location[0]].strip() + ' ' + replacement + ' ' + self.text[location[0] + location[1]:].strip()
+    
+    def removeDuplicates(self, mentions):
+        seen = []
+        for mention in mentions:
+            if mention not in seen:
+                seen += [mention]
+        return seen
+    
+    def removeAllPeople(self):
+        self.replaceMentions()
+        self.removePeople()
+    
+    def removePeople(self):
+        split = self.text.split(' ')
+        words = []
+        for word in split:
+            person = self.ulist.findPerson(word).obj
+            if person != None:
+                self.people += [person]
+                words += [word]
+        for word in words:
+            split.remove(word)
+        self.text = ' '.join(split)
+        
+    def removeBotCall(self):
+        self.text = self.text.split('@rb')[1].lower().strip()
+        
         
 def myconverter(o):
     if isinstance(o, datetime.datetime):
@@ -787,7 +829,7 @@ def read_messages(request_params, group_id, ulist, post_params, timerlist, red, 
                         message['text'],
                         message['user_id'])
         message_list.append(mess)
-
+        
         if mess.sender_type == 'bot' or mess.sender_type == 'system':
             continue
         else:
@@ -796,7 +838,8 @@ def read_messages(request_params, group_id, ulist, post_params, timerlist, red, 
             commands(mess, ulist, post_params, timerlist, request_params, group_id, red)
             if not testmode and mess.text is not None:
                 users_write(ulist)
-                parser = Parser(mess.text, mess, ulist)
+                form = Formatter(mess, ulist)
+                parser = Parser(form)
                 parser.formatForRecorder()
                 word_dict.add(mess.sender_id, parser.text)
                 word_dict.realness()
@@ -983,10 +1026,10 @@ def helper_specific(post_params, text):
     send_message(post_params)
 
 
-def remove_realness(change_dict, message, ulist, post_params):
+def remove_realness(change_dict, form, post_params):
     text = 'Not Real. '
     for user in change_dict.keys():
-        result = user.adjustRealness(message, 'subtract', ulist, post_params, change_dict[user])
+        result = user.adjustRealness(form, 'subtract', post_params, change_dict[user])
         if (not result.success):
             post_params['text'] = result.obj
             send_message(post_params)
@@ -997,10 +1040,10 @@ def remove_realness(change_dict, message, ulist, post_params):
     else:
         return ReturnObject(False)
 
-def add_realness(change_dict, message, ulist, post_params):
+def add_realness(change_dict, form, post_params):
     text = 'Very Real. '
     for user in change_dict.keys():
-        result = user.adjustRealness(message, 'add', ulist, post_params, change_dict[user])
+        result = user.adjustRealness(form, 'add', post_params, change_dict[user])
         if (not result.success):
             post_params['text'] = result.obj
             send_message(post_params)
@@ -1011,35 +1054,35 @@ def add_realness(change_dict, message, ulist, post_params):
     else:
         return ReturnObject(False)
 
-def very_real(text, message, ulist, post_params):
-    person = ulist.find(message.sender_id)
+def very_real(form, post_params):
+    person = form.ulist.find(form.message.sender_id)
     if person.last > (datetime.now() - timedelta(minutes=15)):
         post_params['text'] = "Sorry, you can only use this once every 15 minutes"
-    parser = Parser(text, message, ulist)
+    parser = Parser(form)
     result = parser.whoToChange()
     if (not result.success):
         post_params['text'] = result.obj
         send_message(post_params)
     else:
-        post_text = add_realness(result.obj, message, ulist, post_params)
+        post_text = add_realness(result.obj, form, post_params)
         if (post_text.success):
             post_params['text'] = post_text.obj
             send_message(post_params)
     person.last = datetime.now()
         
-def not_real(text, message, ulist, post_params):
-    person = ulist.find(message.sender_id)
+def not_real(form, post_params):
+    person = form.ulist.find(form.message.sender_id)
     if person.last > (datetime.now() - timedelta(minutes=15)):
         post_params['text'] = "Sorry, you can only use this once every 15 minutes"
         send_message(post_params)
         return
-    parser = Parser(text, message, ulist)
+    parser = Parser(form)
     result = parser.whoToChange()
     if (not result.success):
         post_params['text'] = result.obj
         send_message(post_params)
     else:
-        post_text = remove_realness(result.obj, message, ulist, post_params)
+        post_text = remove_realness(result.obj, form, post_params)
         if (post_text.success):
             post_params['text'] = post_text.obj
             send_message(post_params)
@@ -1273,15 +1316,19 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
     elif (fixed_text == '@rb'):
         helper_main(post_params)
     elif (fixed_text.startswith('@rb ')):
-            text = message.text.split('@rb ')
+            form = Formatter(message, ulist)
+            form.replaceMentions()
+            form.removeBotCall()
+            
+            text = message.text.split('@rb')
 
             text = text[1].lower().strip()
 
             if text.startswith('very real'):
-                very_real(text, message, ulist, post_params)
+                very_real(form, post_params)
 
             elif text.startswith('not real'):
-                not_real(text, message, ulist, post_params)
+                not_real(form, post_params)
 
             elif text in ['ranking', 'rankings', 'r']:
                 ulist.ranking(post_params)
@@ -1382,16 +1429,14 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
 
 def run(request_params, post_params, timerlist, group_id, userlist, red, word_dict, testmode):
     while (1 == True):
-#        try:
         read_messages(request_params, group_id, userlist, post_params, timerlist, red, word_dict, testmode)
 
         timerlist.check(post_params)    
 
         time.sleep(1)
-#        except Exception as e:
-#            print(e)
 
-def startup(testmode = False):
+
+def startup(testmode = False, shouldrun = True):
     user_dict = users_load()
     userlist = UserList(user_dict)
     red = Reddit()
@@ -1408,7 +1453,8 @@ def startup(testmode = False):
     for user in sorted(userlist.ulist, key=lambda x: x.realness):
         text += user.nickname +': ' + str(user.realness) + '\n'
     print(text)
-    run(request_params, post_params, timerlist, group_id, userlist, red, word_dict, testmode)
+    if shouldrun:
+        run(request_params, post_params, timerlist, group_id, userlist, red, word_dict, testmode)
 
 
 if __name__ == "__main__":
