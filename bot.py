@@ -56,33 +56,37 @@ class User:
     def changeNickname(self, nickname):
         self.nickname = nickname
 
-    def use_ability(self, rest, ulist, message, post_params):
-        if len(rest) == 2 and rest[1].isdigit():
-            for ability in self.abilities:
-                if (rest[0] == ability.type and int(rest[1]) == ability.val):
-                    self.use(ability, post_params)
-                    return
-            post_params['text'] = "You don't have that ability"
+    def use_ability(self, form, post_params):
+        form.removeCommand('use')
+        abilities = form.contains(self.switch.keys())
+        if len(form.people) > 1:
+            post_params['text'] = "I don't know who you're trying to use that on"
             send_message(post_params)
-        elif len(rest) >= 3 and rest[1].isdigit():
+            return
+        elif len(form.numbers) != 1:
+            post_params['text'] = "I don't know how long your ability lasts for"
+            send_message(post_params)
+            return
+        elif abilities.success and len(abilities.obj) == 1:
+            abilities = abilities.obj
             for ability in self.abilities:
-                if (rest[0] == ability.type and int(rest[1]) == ability.val):
-                    parser = Parser(message.text, message, ulist)
-                    parser.removeMentions()
-                    self.use(ability, post_params, person = ulist.findPerson(parser.split[1]).obj)
+                if abilities[0] == ability.type and form.numbers[0] == ability.val:
+                    self.use(ability, post_params, form.people)
                     return
             post_params['text'] = "You don't have that ability"
             send_message(post_params)
         else:
-            post_params['text'] = "I'm not sure what ability that is.\nTry: @rb protect #number or @rb bomb #number @person"
+            post_params['text'] = "I don't know which ability you want to use"
             send_message(post_params)
-    
-    def use(self, ability, post_params, person = ''):
+       
+    def use(self, ability, post_params, person = []):
         if ability.type == 'bomb':
-            if person == None:
+            if person == []:
                 post_params['text'] = "That's not a person"
                 send_message(post_params)
                 return
+            else:
+                person = person[0]
         exec(self.switch[ability.type])
         self.remove_ability(ability)
         post_params['text'] = ability.type + " used"
@@ -289,6 +293,7 @@ class TimerList:
         self.timerdict[timer.time] = timer
         self.iddict[timer.person.user_id] = timer
         self.min = min(self.timerdict)
+        time.sleep(0.05)
 
     def remove(self, timer, reward, explode):
         try:
@@ -341,26 +346,29 @@ class TimerList:
             post_params['text'] = "Not Real."
             send_message(post_params)
 
-    def set_timer(self, text, message, ulist, post_params):
-        if (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
-            name = message.attachments[0]['loci'][0]
-            rest = text[name[0] + name[1]-3:].strip().split(" ")
-            if (len(rest) == 1 and rest[0].isdigit()):
-                self.add(Timer(True, datetime.now() + (timedelta(minutes=int(rest[0]))), ulist.find(message.attachments[0]['user_ids'][0])))
-                post_params['text'] = 'Timer set for ' + rest[0] + ' minutes'
-                send_message(post_params)
-            else:
-                post_params['text'] = "I don't know when that is: '" + str(text[name[0] + name[1]-3:]) + "'"
-                send_message(post_params)
-        elif (len(text.split(' ')) == 2 and text.split(' ')[1].isdigit()):
-            self.add(Timer(False, datetime.now() + (timedelta(minutes=int(text.split(' ')[1]))), ulist.find(message.sender_id)))
-            post_params['text'] = 'Timer set for ' + text.split(' ')[1] + ' minutes'
-            send_message(post_params)
-        else:
-            post_params['text'] = ("I don't know when or who that is.\n" +
+    def set_timer(self, form, post_params):
+        nonsense = form.findNonsense(['timer'])
+        if nonsense.success:
+            post_params['text'] = ("I don't understand " + nonsense.obj + "\n" +
                                    "Ex. @rb timer @Employed Degenerate 10 or\n" +
                                    "@rb timer 10")
             send_message(post_params)
+       
+        if len(form.numbers) == 1:
+            post_params['text'] = ''
+            if len(form.people) > 0:
+                post_params['text'] += "Timer set for " + str(form.numbers[0]) + " minutes for:"
+                for person in form.people:
+                    self.add(Timer(True, datetime.now() + timedelta(minutes=form.numbers[0]), person))
+                    post_params['text'] += "\n" + person.name
+            else:
+                self.add(Timer(False, datetime.now() + timedelta(minutes=form.numbers[0]), form.sender))
+                post_params['text'] = "Timer set for " + str(form.numbers[0]) + " minutes"
+        else:
+            post_params['text'] = ("I don't know how long you want that for.\n" +
+                                   "Ex. @rb timer @Employed Degenerate 10 or\n" +
+                                   "@rb timer 10")
+        send_message(post_params)
 
 
 class StatEvaluator:
@@ -671,8 +679,11 @@ class Formatter:
     def __init__(self, message, ulist):
         self.message = message
         self.text = message.text.lower().strip()
+        self.sender = ulist.find(message.sender_id)
         self.ulist = ulist
+        self.split = self.text.split(' ')
         self.people = []
+        self.numbers = []
     
     def replaceMentions(self):
         if self.message.type != 'mentions':
@@ -684,7 +695,8 @@ class Formatter:
             replacement = person.name
             location = mention[0]
             self.text = self.text[0:location[0]].strip() + ' ' + replacement + ' ' + self.text[location[0] + location[1]:].strip()
-    
+        self.split = self.text.split(' ')
+            
     def removeDuplicates(self, mentions):
         seen = []
         for mention in mentions:
@@ -697,20 +709,66 @@ class Formatter:
         self.removePeople()
     
     def removePeople(self):
-        split = self.text.split(' ')
         words = []
-        for word in split:
+        for word in self.split:
             person = self.ulist.findPerson(word).obj
             if person != None:
                 self.people += [person]
                 words += [word]
         for word in words:
-            split.remove(word)
-        self.text = ' '.join(split)
+            self.split.remove(word)
+        self.text = ' '.join(self.split)
         
     def removeBotCall(self):
-        self.text = self.text.split('@rb')[1].lower().strip()
+        if self.text.startswith('@rb'):
+            self.text = self.text.split('@rb')[1].lower().strip()
+            self.split = self.text.split(' ')
+        else:
+            return
         
+    def removeCommand(self, command):
+        if self.text.startswith(command):
+            self.text = self.text.split(command)[1].lower().strip()
+            self.split = self.text.split(' ')
+        else:
+            return
+        
+    def containsNonsense(self, words):
+        for word in self.split:
+            if( not word.isdigit() and word not in words):
+                return True
+        return False
+    
+    def findNonsense(self, words):
+        for word in self.split:
+            if( not word.isdigit() and word not in words):
+                return ReturnObject(True, word)
+        return ReturnObject(False)
+    
+    def removeNonsense(self, words):
+        toRemove = []
+        for word in self.split:
+            if( not word.isdigit() and word not in words):
+                toRemove += [word]
+        for word in toRemove:
+            self.split.remove()
+        self.text = ' '.join(self.split)
+    
+    def findNumbers(self):
+        for word in self.split:
+            if word.isdigit():
+                self.numbers += [int(word)]
+    
+    def contains(self, words):
+        con = []
+        for word in self.split:
+            if word in words:
+                con += [word]
+        if len(con) > 0:
+            return ReturnObject(True, con)
+        else:
+            return ReturnObject(False)
+            
         
 def myconverter(o):
     if isinstance(o, datetime.datetime):
@@ -839,9 +897,9 @@ def read_messages(request_params, group_id, ulist, post_params, timerlist, red, 
             if not testmode and mess.text is not None:
                 users_write(ulist)
                 form = Formatter(mess, ulist)
-                parser = Parser(form)
-                parser.formatForRecorder()
-                word_dict.add(mess.sender_id, parser.text)
+                form.replaceMentions()
+                form.removeBotCall()
+                word_dict.add(mess.sender_id, form.text)
                 word_dict.realness()
             
     if len(message_list) > 0:
@@ -858,7 +916,8 @@ def helper_main(post_params, page = 1):
               "very real [@mention]\n" 
               "help [#page|command]\n"
               "timer [@mention] [time]\n"               
-              "@all|@everyone\n"),
+              "@all|@everyone\n"
+              "word [names] [number]"),
     
             ("shop [item] [time]\n" 
              "use [ability] [time] [@mention]\n"
@@ -953,6 +1012,12 @@ def helper_specific(post_params, text):
                        "joke\n"
                        "red_pill\n"
                        "blue_pill\n")
+            
+        elif (reason[0] == 'word'):
+            post_params['text'] = ("There are 3 uses for word:\n\n"
+                       "word [#number] \n(shows top # of words for the group)\n"
+                       "word [names] [#number] \n(shows top # of words for each person mentioned)\n"
+                       "word \n(shows top word for each person)")
             
         elif (reason[0] == 'stats' or reason[0] == 'stat'):
             post_params['text'] = ("There are six stats to lookup:\n\n" +
@@ -1088,8 +1153,8 @@ def not_real(form, post_params):
             send_message(post_params)
     person.last = datetime.now()
 
-def clear(ulist, sender_id, post_params):
-    result = ulist.clearRealness(sender_id)
+def clear(form, post_params):
+    result = form.ulist.clearRealness(form.sender.user_id)
     if (not result.success):
         post_params['text'] = result.obj
         send_message(post_params)
@@ -1097,27 +1162,37 @@ def clear(ulist, sender_id, post_params):
         post_params['text'] = 'Cleared'
         send_message(post_params)
         
-def shop(text, message, ulist, post_params):
-    text = text[1].strip().split(' ')
-    if text[0] in ['protect', 'thornmail', 'bomb']:
-        person = ulist.find(message.sender_id)
-        if (len(text) > 1 and text[1].isdigit()):
-            if text[0] in ['protect', 'bomb']:
-                if person.realness >= 10 * int(text[1]):
-                    person.add_ability(Ability(text[0], int(text[1])))
-                    person.realness -= 10 * int(text[1])
+def shop(form, post_params):
+    items = ['protect', 'bomb', 'thornmail']
+    nonsense = form.findNonsense(items + ['shop'])
+    if nonsense.success:
+        post_params['text'] = ("I don't understand " + nonsense.obj + "\n" +
+                               "Ex. @rb shop protect 10")
+        send_message(post_params)
+        
+    form.removeCommand('shop')
+    product = form.contains(items)
+    if (product.success and len(product.obj) == 1):
+        person = form.sender
+        form.findNumbers()
+        numbers = form.numbers
+        if (len(numbers) == 1):
+            if product.obj[0] in ['protect', 'bomb']:
+                if person.realness >= 10 * int(numbers[0]):
+                    person.add_ability(Ability(product.obj[0], int(numbers[0])))
+                    person.realness -= 10 * int(numbers[0])
 
-                    post_params['text'] = "Ok, 1 " +text[0]+ " ability."
+                    post_params['text'] = "Ok, 1 " +product.obj[0]+ " ability."
                     send_message(post_params)
                 else:
                     post_params['text'] = 'Fuck off peasant.'
                     send_message(post_params)
-            elif text[0] in ['thornmail']:
-                if person.realness >= 15 * int(text[1]):
-                    person.add_ability(Ability(text[0], int(text[1])))
-                    person.realness -= 15 * int(text[1])
+            elif product.obj[0] in ['thornmail']:
+                if person.realness >= 15 * int(numbers[0]):
+                    person.add_ability(Ability(product.obj[0], int(numbers[0])))
+                    person.realness -= 15 * int(numbers[0])
 
-                    post_params['text'] = "Ok, 1 " +text[0]+ " ability. That'll last yah " + text[1] + ' days.'
+                    post_params['text'] = "Ok, 1 " +product.obj[0]+ " ability. That'll last yah " + numbers[0] + ' days.'
                     send_message(post_params)
                 else:
                     post_params['text'] = 'Fuck off peasant.'
@@ -1131,15 +1206,22 @@ def shop(text, message, ulist, post_params):
             send_message(post_params)
 
     else:
-        post_params['text'] = "I don't have that ability for sale... yet."
+        post_params['text'] = "I don't know what ability you want"
         send_message(post_params)
 
-def format_all(ulist):
+def format_all(ulist, peoplelist = []):
     loci = []
-    user_ids = list(ulist.ids.keys())
-    for i,person in enumerate(user_ids):
-        loci += [[i,i+1]]
-    return [{'loci': loci, 'type':'mentions', 'user_ids':user_ids}]
+    if len(peoplelist) > 0:
+        user_ids = []
+        for i,person in enumerate(peoplelist):
+            loci += [[i,i+1]]
+            user_ids += [person.user_id]
+        return [{'loci': loci, 'type':'mentions', 'user_ids':user_ids}]
+    else:
+        user_ids = list(ulist.ids.keys())
+        for i,person in enumerate(user_ids):
+            loci += [[i,i+1]]
+        return [{'loci': loci, 'type':'mentions', 'user_ids':user_ids}]
 
 def call_all(message, ulist, post_params):
     
@@ -1230,37 +1312,39 @@ def red_pill(post_params, red):
     else:
         send_message(post_params)
         
-def games(ulist, text, message, post_params, timerlist):
-    sender_id = message.sender_id
-    split = text.split(' ')
-    length = len(split)
-    if len(message.attachments) != 0 and message.attachments[0]['type'] == 'mentions':
-        people = message.attachments[0]['user_ids']
-        if not split[-1].isdigit():
-            for user in people:
-                user = ulist.find(user)
-                timerlist.add(Timer(True, datetime.now() + timedelta(minutes= 60), user, True))
-            post_params['text'] = "Games??? T minus 60 minutes"
-        else:
-            for user in people:
-                user = ulist.find(user)
-                timerlist.add(Timer(True, datetime.now() + timedelta(minutes= int(split[-1])), user, True))
-            post_params['text'] = "Games??? T minus " + split[1] + " minutes"
-    elif  length > 2 or (length == 2 and not split[1].isdigit()):
-        post_params['text'] = "The games command takes a number for how many minutes to wait for people." + "ex. @rb games 60 or @rb games @friendido @friendido2 60"
+def games(form, post_params, timerlist):
+    nonsense = form.findNonsense(['games'])
+    if nonsense.success:
+        post_params['text'] = ("I don't understand " + nonsense.obj + "\n" +
+                               "Ex. @rb games @Employed Degenerate 10 or\n" +
+                               "@rb games")
         send_message(post_params)
-        return
-    elif length == 1:
-        for user in ulist.ulist:
-            if (user.user_id == sender_id): continue
+    
+    people = []
+    if len(form.people) > 0:
+        people = form.people
+    else:
+        people = form.ulist.ulist
+    numbers = form.numbers
+    if len(numbers) == 1:
+        for user in people:
+            if (user.user_id == form.sender.user_id): continue
+            timerlist.add(Timer(True, datetime.now() + timedelta(minutes= numbers[0]), user, True))
+        post_params['text'] = "Games??? T minus "+str(numbers[0])+" minutes"
+
+    elif len(numbers) == 0:
+        for user in people:
+            if (user.user_id == form.sender.user_id): continue
             timerlist.add(Timer(True, datetime.now() + timedelta(minutes= 60), user, True))
         post_params['text'] = "Games??? T minus 60 minutes"
-    elif length == 2:
-        for user in ulist.ulist:
-            if (user.user_id == sender_id): continue
-            timerlist.add(Timer(True, datetime.now() + timedelta(minutes= int(split[1])), user, True))
-        post_params['text'] = "Games??? T minus " + split[1] + " minutes"
-    post_params['attachments'] = format_all(ulist)
+
+    else:
+        post_params['text'] = ("I don't know how long you want that for.\n" +
+                               "Ex. @rb games @Employed Degenerate 10 or\n" +
+                               "@rb games")
+        send_message(post_params)
+        return
+    post_params['attachments'] = format_all(form.ulist, people)
     send_message(post_params)
     post_params['attachments'] = []
         
@@ -1270,83 +1354,114 @@ def games_reply(user_id, text, post_params, timerlist):
     else:
         timerlist.games_answer(user_id, False, post_params)
             
-def evaluate(post_params, text, message, ulist, group_id):
-    split = text.split(' ')
-    if len(split) == 1:
+def evaluate(post_params, form, group_id):
+    if len(form.numbers) > 1:
+        post_params['text'] = "Too many numbers, just 1 please."
+        send_message(post_params)
+        return
+    nonsense = form.findNonsense(['word', 'words'])
+    if nonsense.success:
+        post_params['text'] = ("I don't understand " + nonsense.obj + "\n" +
+                               "Ex. @rb word @Employed Degenerate 10 or\n" +
+                               "@rb word")
+        send_message(post_params)
+    if len(form.people) == 0 and len(form.numbers) == 0:
         evaluator = StatEvaluator(group_id)
-        evaluator.evaluate(ulist)
-        word_list = evaluator.mostCommonWordForEachPerson(ulist)
+        evaluator.evaluate(form.ulist)
+        word_list = evaluator.mostCommonWordForEachPerson(form.ulist)
         post_params['text'] = ''
         for word in word_list:
             post_params['text'] += word[0] + ": " + word[1][1] + "\n"
         send_message(post_params)
-    elif (message.attachments != [] and message.type == 'mentions'):
+    elif len(form.numbers) == 1:
+        if len(form.people) > 0:
+            evaluator = StatEvaluator(group_id)
+            evaluator.evaluate(form.ulist)
+            word_list = []
+            for user in form.people:
+                word_list += evaluator.mostCommonWordForPerson(user, form.numbers[0])
+            post_params['text'] = ''
+            for word in word_list:
+                post_params['text'] += word[0] + ":\n" 
+                for tup in word[1]:
+                    post_params['text'] += tup[1] + '  ' + str(tup[0]) + "\n"
+                post_params['text'] += "\n"
+            send_message(post_params)
+        else:
+            evaluator = StatEvaluator(group_id)
+            evaluator.evaluate(form.ulist)
+            word_list = evaluator.mostCommonWordForAll(int(form.numbers[0]))
+            post_params['text'] = ''
+            for word in word_list:
+                post_params['text'] += word[1] + "  " + str(word[0])  +  "\n"
+            send_message(post_params)
+    else:
         evaluator = StatEvaluator(group_id)
-        evaluator.evaluate(ulist)
+        evaluator.evaluate(form.ulist)
         word_list = []
-        for user_id in message.user_ids:
-            user = ulist.find(user_id)
+        for user in form.people:
             word_list += evaluator.mostCommonWordForPerson(user, 10)
         post_params['text'] = ''
         for word in word_list:
             post_params['text'] += word[0] + ":\n" 
             for tup in word[1]:
                 post_params['text'] += tup[1] + '  ' + str(tup[0]) + "\n"
+            post_params['text'] += "\n"
         send_message(post_params)
-    elif (len(split) == 2 and split[1].isdigit()):
-        evaluator = StatEvaluator(group_id)
-        evaluator.evaluate(ulist)
-        word_list = evaluator.mostCommonWordForAll(int(split[1]))
-        post_params['text'] = ''
-        for word in word_list:
-            post_params['text'] += word[1] + "  " + str(word[0])  +  "\n"
-        send_message(post_params)
+
         
 #checks for last message and runs commands
 def commands(message, ulist, post_params, timerlist, request_params, group_id, red):
     if message.text == None:
         return
-    fixed_text = message.text.lower().strip()
-    if fixed_text.startswith('here'):
+    form = Formatter(message, ulist)
+    text = form.text
+    if text.startswith('here'):
         timerlist.cancel_timer(message.user_id, post_params)
-    elif fixed_text.startswith('yes') or fixed_text.startswith('no'):
-        games_reply(message.user_id, fixed_text, post_params, timerlist)
+    elif text.startswith('yes') or text.startswith('no'):
+        games_reply(message.user_id, text, post_params, timerlist)
     elif call_all(message, ulist, post_params):
         return
-    elif (fixed_text == '@rb'):
+    elif (text == '@rb'):
         helper_main(post_params)
-    elif (fixed_text.startswith('@rb ')):
-            form = Formatter(message, ulist)
+    elif (text.startswith('@rb ')):
+            
             form.replaceMentions()
             form.removeBotCall()
             
-            text = message.text.split('@rb')
-
-            text = text[1].lower().strip()
-
+            text = form.text
+            
+            #do not completely remove people references in text for these
+            #Position of the references are important
             if text.startswith('very real'):
                 very_real(form, post_params)
+                return
 
             elif text.startswith('not real'):
                 not_real(form, post_params)
-
-            elif text in ['ranking', 'rankings', 'r']:
+                return
+            
+            #remove mentions first, allows for less f-ups
+            form.removePeople()
+            form.findNumbers()
+            text = form.text
+            if text in ['ranking', 'rankings', 'r']:
                 ulist.ranking(post_params)
 
             elif text.startswith('timer'):
-                timerlist.set_timer(text, message, ulist, post_params)
+                timerlist.set_timer(form, post_params)
 
             elif (text.startswith("help")):
                 helper_specific(post_params, text)
                 
             elif (text.startswith('reward')):
-                ulist.find(message.sender_id).daily_reward(post_params)
+                form.sender.daily_reward(post_params)
 
             elif (text.startswith('here')):
                 timerlist.cancel_timer(message.user_id, post_params)
 
             elif (text.startswith('shop')):
-                shop((text.split('shop')), message, ulist, post_params)
+                shop(form, post_params)
                 
             elif (text == 'joke'):
                 joke(post_params, red)
@@ -1367,17 +1482,16 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
                 blue_pill(post_params, red)
                 
             elif (text.startswith('games')):
-                games(ulist, text, message, post_params, timerlist)
+                games(form, post_params, timerlist)
             
-            elif (text.startswith('word')):
-                evaluate(post_params, text, message, ulist, group_id)
+            elif (text.startswith('word') or text.startswith('words')):
+                evaluate(post_params, form, group_id)
             
             elif (text.startswith('use')):
-                rest = text.split('use')[1].strip().split(' ')
-                ulist.find(message.sender_id).use_ability(rest, ulist, message, post_params)
+                form.sender.use_ability(form, post_params)
             
             elif (text == 'clear'):
-                clear(ulist, message.sender_id, post_params)
+                clear(form, post_params)
             
             elif (text.startswith('play')):
                 t = text.split(' ')
@@ -1458,4 +1572,4 @@ def startup(testmode = False, shouldrun = True):
 
 
 if __name__ == "__main__":
-    startup(True)
+    startup()
