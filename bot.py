@@ -1367,8 +1367,8 @@ def games(form, post_params, timerlist):
     send_message(post_params)
     post_params['attachments'] = []
 
-def games_reply(user_id, text, post_params, timerlist):
-    if text.startswith("yes"):
+def games_reply(user_id, text, post_params, timerlist, answer):
+    if answer == "yes":
         timerlist.games_answer(user_id, True, post_params)
     else:
         timerlist.games_answer(user_id, False, post_params)
@@ -1469,6 +1469,37 @@ def reee(post_params):
     post_params['attachments']=[{"type":"image","url":"https://i.groupme.com/828x828.gif.0587229f90fa489187bdc94f3d74d231.large"}]
     send_message(post_params)
     post_params['attachments']=[]
+    
+def play_game(form, post_params):
+    nonsense = form.findNonsense(['play', 'phone', 'computer', 'both'])
+    if nonsense.success:
+        post_params['text'] = ("I don't understand " + nonsense.obj + "\n" +
+                               "Ex. @rb play @Employed Degenerate or\n" +
+                               "@rb play")
+        send_message(post_params)
+    
+    player2 = ''
+    player2_name = ''
+    player1 = form.sender.user_id
+    player1_name = form.sender.nickname
+    if len(form.people) > 1:
+        post_params['text'] = "You can only play 1 person at a time"
+        send_message(post_params)
+        return
+    if len(form.people) == 1:
+        player2 = form.people[0].user_id
+        player2_name = form.people[0].nickname
+    mode = form.contains(['phone', 'computer', 'both'])
+    if mode.success:
+        if len(mode.obj) > 1:
+            post_params['text'] = "I don't know which mode you want, just use one."
+            send_message(post_params)
+            return
+        mode = mode.obj[0]
+    else:
+        mode = 'phone'
+        
+    play(form.ulist, player1, player1_name, player2, player2_name, mode)
 
 #checks for last message and runs commands
 def commands(message, ulist, post_params, timerlist, request_params, group_id, red):
@@ -1478,10 +1509,12 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
     text = form.text
     if 'reee' in text:
         reee(post_params)
-    if text.startswith('here'):
+    if 'here' in text:
         timerlist.cancel_timer(message.user_id, post_params)
-    elif text.startswith('yes') or text.startswith('no'):
-        games_reply(message.user_id, text, post_params, timerlist)
+    elif any(word in text for word in ['yes','yah','yeah', 'yea', 'ya']):
+        games_reply(message.user_id, text, post_params, timerlist, 'yes')
+    elif any(word in text for word in ['no','nah','nope']):
+        games_reply(message.user_id, text, post_params, timerlist, 'no')
     elif call_all(message, ulist, post_params):
         return
     elif (text == '@rb'):
@@ -1556,31 +1589,7 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
                 clear(form, post_params)
 
             elif (text.startswith('play')):
-                t = text.split(' ')
-                if len(t) == 1 or len(t) == 2:
-                    if text.endswith('both'):
-                        play(ulist, message.sender_id, message.name, '', '', 'both')
-                    elif text.endswith('computer'):
-                        play(ulist, message.sender_id, message.name, '', '', 'computer')
-                    else:
-                        play(ulist, message.sender_id, message.name, '', '', 'phone')
-                    return
-                elif (message.attachments != [] and message.attachments[0]['type'] == 'mentions'):
-                    person = message.attachments[0]['user_ids']
-                    if len(person) == 1:
-                        if text.endswith('both'):
-                            name = ulist.find(person[0]).nickname
-                            play(ulist, message.sender_id, message.name, person[0], name, 'both')
-                        elif text.endswith('computer'):
-                            name = ulist.find(person[0]).nickname
-                            play(ulist, message.sender_id, message.name, person[0], name, 'computer')
-                        else:
-                            name = ulist.find(person[0]).nickname
-                            play(ulist, message.sender_id, message.name, person[0], name, 'phone')
-                    else:
-                        helper_main(post_params)
-                else:
-                    helper_main(post_params)
+                play_game(form, post_params)
 
             elif (text.lower().startswith('@') and message.attachments != []):
                 user = message.attachments[0]['user_ids']
