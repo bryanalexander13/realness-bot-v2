@@ -8,6 +8,10 @@ import random
 from reddit_bot import Reddit
 import string
 from collections import defaultdict
+import pandas as pd
+import plotly
+import plotly.graph_objs as go
+
 
 class User:
     """Users information"""
@@ -39,7 +43,7 @@ class User:
                 "reward": self.datetime_write(self.reward),
                 "permission": self.permission,
                 "last": self.datetime_write(self.last)}
-        
+
 
     def add_realness(self, multiplier=1):
         self.realness += multiplier
@@ -78,7 +82,7 @@ class User:
         else:
             post_params['text'] = "I don't know which ability you want to use"
             send_message(post_params)
-       
+
     def use(self, ability, post_params, person = []):
         if ability.type == 'bomb':
             if person == []:
@@ -105,7 +109,7 @@ class User:
         if self.reward <= datetime.now() - timedelta(days=1):
             ran = random.randint(0,9)
             if ran > 0:
-                rew = max(min(round(abs(random.gauss(0,4))), 10), 1) 
+                rew = max(min(round(abs(random.gauss(0,4))), 10), 1)
                 self.add_realness(rew)
                 post_params['text'] = "You got " + str(rew) + "rp"
                 send_message(post_params)
@@ -125,7 +129,7 @@ class User:
             timeleft = str((self.reward + timedelta(days=1)) - datetime.now()).split('.')[0].split(':')
             post_params['text'] = "Sorry, you already gotten your reward for today. " + timeleft[0] + "h " + timeleft[1] + "m " + timeleft[2] + "s left."
             send_message(post_params)
-                
+
     def datetime_write(self, date):
         return date.strftime("%Y-%m-%d %H:%M:%S.%f")
 
@@ -150,7 +154,7 @@ class User:
         else:
             post_params['text'] = str(self.__dict__()[val])
             send_message(post_params)
-    
+
     def adjustRealness(self, form, reason, post_params, multiplier = 1):
         if (form.message.sender_id == self.user_id):
             return ReturnObject(False, "You can't adjust your own realness")
@@ -213,7 +217,7 @@ class UserList:
             return self.nicknames[nickname]
         except:
             return User("0", "invalid", "invalid")
-        
+
     def findPerson(self, word):
         for finder in self.peopleFinders:
             person = finder(word)
@@ -249,7 +253,7 @@ class UserList:
         else:
             user.nickname = message.name
             return True
-    
+
     def clearRealness(self, sender):
         if (self.find(sender).permission == 'admin'):
             for user in self.ulist:
@@ -257,7 +261,7 @@ class UserList:
             return ReturnObject(True)
         else:
             return ReturnObject(False, "Sorry, only admins have this ability")
-        
+
 
 class Timer:
 
@@ -322,7 +326,7 @@ class TimerList:
         if timer.time <= datetime.now():
             timer.explode(post_params)
             self.remove(timer, True, True)
-    
+
     def cancel_timer(self, user_id, post_params):
         try:
             timer = self.iddict[user_id]
@@ -331,7 +335,7 @@ class TimerList:
         if self.remove(timer, False, False):
             post_params['text'] = "Finally"
             send_message(post_params)
-            
+
     def games_answer(self, user_id, play, post_params):
         try:
             timer = self.iddict[user_id]
@@ -354,7 +358,7 @@ class TimerList:
                                    "Ex. @rb timer @Employed Degenerate 10 or\n" +
                                    "@rb timer 10")
             send_message(post_params)
-       
+
         if len(form.numbers) == 1:
             post_params['text'] = ''
             if len(form.people) > 0:
@@ -379,7 +383,7 @@ class StatEvaluator:
         self.person_stats = defaultdict(lambda: defaultdict(int))
         self.total_stats = defaultdict(int)
         self.common = self.readCommon()
-        
+
     def readDict(self):
         try:
             with open(os.path.abspath('word_'+self.group_id+'.json'),'r') as s:
@@ -389,50 +393,50 @@ class StatEvaluator:
             return word_dict
         except:
             return {}
-    
+
     def readCommon(self):
         with open(os.path.abspath('common.txt'),'r') as s:
             file = s.readlines()
             word_dict = [word.strip('\n').lower().translate(''.maketrans("","",string.punctuation)) for word in file]
             s.close()
         return word_dict
-            
+
     def evaluate(self, ulist):
         for user in ulist.ulist:
             messages = self.word_dict[user.user_id].values()
             for ind, message in enumerate(messages):
                 try:
                     message =  message.strip().lower().translate(''.maketrans("","",string.punctuation)).split()
-                
+
                     for word in message:
                         self.total_stats[word] += 1
                         self.person_stats[user.user_id][word] += 1
                 except:
                     continue
-    
+
     def mostCommonWordForEachPerson(self, ulist):
         out = []
         for user in ulist.ulist:
             person_dict = self.person_stats[user.user_id]
-            max_val = sorted(zip(person_dict.values(), person_dict.keys()))[::-1]         
+            max_val = sorted(zip(person_dict.values(), person_dict.keys()))[::-1]
             for item in max_val:
                 if item[1] in self.common: continue
                 out += [(user.nickname, item)]
                 break
         return out
-    
+
     def mostCommonWordForPerson(self, user, top):
         out = []
         person_dict = self.person_stats[user.user_id]
-        max_val = sorted(zip(person_dict.values(), person_dict.keys()))[::-1]         
+        max_val = sorted(zip(person_dict.values(), person_dict.keys()))[::-1]
         for item in max_val:
             if top <= 0:
                 break
             if item[1] in self.common: continue
-            out += [item]    
+            out += [item]
             top -= 1
         return [(user.nickname, out)]
-    
+
     def mostCommonWordForAll(self, top):
         out = []
         max_val = sorted(zip(self.total_stats.values(), self.total_stats.keys()))[::-1]
@@ -440,10 +444,10 @@ class StatEvaluator:
             if top <= 0:
                 break
             if item[1] in self.common: continue
-            out += [item]    
+            out += [item]
             top -= 1
         return out
-            
+
 
 class Recorder:
     def __init__(self, group_id, ulist, realness_stat = '', word_dict = ''):
@@ -457,16 +461,16 @@ class Recorder:
             self.read_realness()
         else:
             self.realness_stat = realness_stat
-    
+
     def realness(self):
         self.realness_stat[str(datetime.now())] = self.ulist.realnesses
         self.record_realness()
-        
+
     def record_realness(self):
         with open(os.path.abspath('realness_stat.json'),'w') as s:
             s.write(json.dumps(self.realness_stat))
             s.close()
-            
+
     def read_realness(self):
         try:
             with open(os.path.abspath('realness_stat.json'),'r') as s:
@@ -475,7 +479,7 @@ class Recorder:
                 s.close()
         except:
             self.realness_stat = {}
-    
+
     def add(self, user_id, text):
         try:
             self.word_dict[user_id][str(datetime.now())] = text
@@ -483,12 +487,12 @@ class Recorder:
         except:
             self.word_dict[user_id] = {str(datetime.now()) : text}
             self.record_dict()
-            
+
     def record_dict(self):
         with open(os.path.abspath('word_'+self.group_id+'.json'),'w') as s:
             s.write(json.dumps(self.word_dict))
             s.close()
-            
+
     def read_dict(self):
         try:
             with open(os.path.abspath('word_'+self.group_id+'.json'),'r', encoding='utf8', errors='ignore') as s:
@@ -497,8 +501,8 @@ class Recorder:
                 s.close()
         except:
             self.word_dict = {}
-            
-    
+
+
 
 class Message:
     """A message handler"""
@@ -546,11 +550,11 @@ class Message:
                 self.poll_id = item['poll_id']
             else:
                 return
-            
+
 
     def count_likes(self):
         return len(self.liked)
-    
+
 class ReturnObject:
     def __init__(self, success = False, obj = None):
         self. success = success
@@ -567,16 +571,16 @@ class Parser():
         self.totals = {}
         self.currentPersonToChange = None
         self.max = 3
-        
+
     def whoToChange(self):
         validate = self.valid_command()
         if (not validate.success):
             return validate
         self.removeNonsense()
         return self.findPeopleAndAmounts()
-    
+
     def valid_command(self):
-        strip_command = self.text.split(' ')[2:] 
+        strip_command = self.text.split(' ')[2:]
         if (strip_command == []):
             return ReturnObject(False, "You need to tell me a person too.")
         else:
@@ -584,8 +588,8 @@ class Parser():
             if (len(self.split) == 1 and self.split[0].isdigit()):
                 return ReturnObject(False, "You need to tell me a person too.")
             else:
-                return ReturnObject(True)      
-    
+                return ReturnObject(True)
+
     def removeMentions(self):
         if self.message.type != 'mentions':
             self.text = self.message.text[3:].lower().strip()
@@ -600,7 +604,7 @@ class Parser():
             self.message.text = self.message.text[0:location[0]] + replacement + self.message.text[location[0] + location[1]:]
         self.text = self.message.text[3:].lower().strip()
         self.split = self.text.split(' ')[2:]
-        
+
     def formatForRecorder(self):
         if self.message.type == 'mentions':
             user_ids = self.message.attachments[0]['user_ids'][::-1]
@@ -614,26 +618,26 @@ class Parser():
             self.text = self.message.text[3:].lower().strip()
         else:
             self.text = self.message.text.lower().strip()
-       
+
     def removeNonsense(self):
         toDel = []
         for ind, word in enumerate(self.split):
             personResult = self.ulist.findPerson(word)
             if personResult.success: continue
-            
+
             digit = word.isdigit()
             if digit: continue
-            
+
             if self.split[ind:ind+2] == ["mad","realness"]:
                 self.split[ind] = "3"
             elif word == "madrealness":
                 self.split[ind] = "3"
             else:
                 toDel += [ind]
-            
+
         for ind,i in enumerate(toDel):
             del self.split[i - ind]
-    
+
     def findPeopleAndAmounts(self):
         check = 'person'
         for word in self.split:
@@ -642,18 +646,18 @@ class Parser():
                 check = 'person'
                 if (result.success):
                     continue
-                
+
             if (check == 'person'):
                 personResult = self.addPersonToTotal(word)
                 if (not personResult.success):
                     return personResult
                 check = 'amount'
-        
+
         for key in self.totals:
             self.totals[key] = min(self.totals[key],self.max)
-        
+
         return ReturnObject(True, self.totals)
-            
+
     def addPersonToTotal(self, word):
         person = self.ulist.findPerson(word)
         if (person.success):
@@ -663,9 +667,9 @@ class Parser():
             except:
                 self.totals[person.obj] = 1
             return ReturnObject(True)
-        else: 
+        else:
             return ReturnObject(False, "Invalid Person(s)")
-    
+
     def addAmountToPerson(self, word):
         if word.isdigit():
             try:
@@ -675,7 +679,7 @@ class Parser():
             return ReturnObject(True)
         else:
             return ReturnObject(False, "Invalid Amount(s)")
-         
+
 class Formatter:
     def __init__(self, message, ulist):
         self.message = message
@@ -685,7 +689,7 @@ class Formatter:
         self.split = self.text.split(' ')
         self.people = []
         self.numbers = []
-    
+
     def replaceMentions(self):
         if self.message.type != 'mentions':
             return
@@ -697,18 +701,18 @@ class Formatter:
             location = mention[0]
             self.text = self.text[0:location[0]].strip() + ' ' + replacement + ' ' + self.text[location[0] + location[1]:].strip()
         self.split = self.text.split(' ')
-            
+
     def removeDuplicates(self, mentions):
         seen = []
         for mention in mentions:
             if mention not in seen:
                 seen += [mention]
         return seen
-    
+
     def removeAllPeople(self):
         self.replaceMentions()
         self.removePeople()
-    
+
     def removePeople(self):
         words = []
         for word in self.split:
@@ -719,33 +723,33 @@ class Formatter:
         for word in words:
             self.split.remove(word)
         self.text = ' '.join(self.split)
-        
+
     def removeBotCall(self):
         if self.text.startswith('@rb'):
             self.text = self.text.split('@rb')[1].lower().strip()
             self.split = self.text.split(' ')
         else:
             return
-        
+
     def removeCommand(self, command):
         if self.text.startswith(command):
             self.text = self.text.split(command)[1].lower().strip()
             self.split = self.text.split(' ')
         else:
             return
-        
+
     def containsNonsense(self, words):
         for word in self.split:
             if( not word.isdigit() and word not in words):
                 return True
         return False
-    
+
     def findNonsense(self, words):
         for word in self.split:
             if( not word.isdigit() and word not in words):
                 return ReturnObject(True, word)
         return ReturnObject(False)
-    
+
     def removeNonsense(self, words):
         toRemove = []
         for word in self.split:
@@ -754,12 +758,12 @@ class Formatter:
         for word in toRemove:
             self.split.remove()
         self.text = ' '.join(self.split)
-    
+
     def findNumbers(self):
         for word in self.split:
             if word.isdigit():
                 self.numbers += [int(word)]
-    
+
     def contains(self, words):
         con = []
         for word in self.split:
@@ -769,8 +773,8 @@ class Formatter:
             return ReturnObject(True, con)
         else:
             return ReturnObject(False)
-            
-        
+
+
 def myconverter(o):
     if isinstance(o, datetime.datetime):
         return o.__str__()
@@ -783,6 +787,12 @@ def auth_load():
         data = json.loads(file[0])
         auth.close()
     return data
+
+def read_auth():
+    with open(os.path.abspath('bot_auth.json'),'r') as auth:
+        file = auth.readlines()
+        data = json.loads(file[0])
+        return data
 
 def users_load():
     """Loads users from users2.json.
@@ -847,6 +857,14 @@ def members(request_params, group_id):
     group = requests.get('https://api.groupme.com/v3/groups/' + group_id, params = request_params).json()['response']
     return group['members']
 
+def upload_image(request_params, filename=None,ImageData=None):
+    """Uploads image file or image data (binary) to GroupMe Image Service.  Returns url."""
+    if filename is not None:
+        with open(os.path.abspath(fp), 'rb') as pic:
+            ImageData = pic.read()
+    url = requests.post('https://image.groupme.com/pictures', params=request_params , data=ImageData).json()['payload']['url']
+    return url
+
 def send_message(post_params):
     """Sends message to group.
     :param dict post_params: bot_id, text required"""
@@ -888,7 +906,7 @@ def read_messages(request_params, group_id, ulist, post_params, timerlist, red, 
                         message['text'],
                         message['user_id'])
         message_list.append(mess)
-        
+
         if mess.sender_type == 'bot' or mess.sender_type == 'system':
             continue
         else:
@@ -902,7 +920,7 @@ def read_messages(request_params, group_id, ulist, post_params, timerlist, red, 
                 form.removeBotCall()
                 word_dict.add(mess.sender_id, form.text)
                 word_dict.realness()
-            
+
     if len(message_list) > 0:
         last_write(message_list[0].id)
 
@@ -913,14 +931,14 @@ def helper_main(post_params, page = 1):
     :param dict post_params: text, bot_id required"""
     header = "These are the following commands:\n"
     pages = [
-            ("not real [@mention]\n" 
-              "very real [@mention]\n" 
+            ("not real [@mention]\n"
+              "very real [@mention]\n"
               "help [#page|command]\n"
-              "timer [@mention] [time]\n"               
+              "timer [@mention] [time]\n"
               "@all|@everyone\n"
               "word [names] [number]"),
-    
-            ("shop [item] [time]\n" 
+
+            ("shop [item] [time]\n"
              "use [ability] [time] [@mention]\n"
              "reward\n"
              "games [@mention] [time]\n"
@@ -937,7 +955,7 @@ def helper_main(post_params, page = 1):
     max_page = len(pages)
     page = (page - 1)%max_page
     tail = "page " + str(page + 1) + "/" + str(max_page)
-    
+
     post_params['text'] = header + pages[page] + tail
     send_message(post_params)
 
@@ -951,61 +969,61 @@ def helper_specific(post_params, text):
         if (reason[0] == "not"):
             post_params['text'] = ("The not real command is used to shame a user for their lack of realness\n" +
                       "Example: @rb not real Carter")
-            
+
         elif (reason[0] == "very"):
             post_params['text'] = ("The very real command is used to reward a user for their excess of realness\n" +
                       "Example: @rb very real Carter")
-            
+
         elif (reason[0] == "ranking"):
             post_params['text'] = ("The ranking command shows how real everyone is\n" +
                       "Example: @rb ranking")
-            
+
         elif (reason[0] == "timer"):
             post_params['text'] = ("Set a timer in minutes so people aren't late\n" +
                       "Example: @rb timer @LusciousBuck 10")
-            
+
         elif (reason[0] == 'shop'):
             post_params['text'] = ("Shop for radical abilities dude\n" +
                       "Example: @rb shop protect 10")
-            
+
         elif (reason[0] == 'use'):
             post_params['text'] = ("Use your radical abilities dude\n" +
                       "Example: @rb use protect 10")
-            
+
         elif (reason[0] == 'toot'):
             post_params['text'] = ("Gives a random comment made by Carter on Reddit\n" +
                       "Example: @rb toot")
-            
+
         elif (reason[0] == 'meme'):
             post_params['text'] = ("Gives a random meme from r/dankmemes\n" +
                       "Example: @rb meme")
-            
+
         elif (reason[0] == 'joke'):
             post_params['text'] = ("Gives a random joke from r/jokes\n" +
                       "Example: @rb joke")
-            
+
         elif (reason[0] == 'bluepill' or reason[0] == 'blue_pill'):
             post_params['text'] = ("Gives a random post from r/esist\n" +
                       "Example: @rb blue_pill")
-            
+
         elif (reason[0] == 'redpill' or reason[0] == 'red_pill'):
             post_params['text'] = ("Gives a random post from r/the_donald\n" +
                       "Example: @rb red_pill")
-            
+
         elif (reason[0] == 'games'):
-            post_params['text'] = ("Sets a timer that rewards and punishes people for playing games.\n" 
+            post_params['text'] = ("Sets a timer that rewards and punishes people for playing games.\n"
                        "You can leave out the @mentions to send the message to everyone.\n"
                        "You can also leave out the time and it will default to 60 minutes.\n"
                        "Example: @rb games @friendido 100")
-            
+
         elif (reason[0] == 'play'):
-            post_params['text'] = ("Play connect four against a bot or friend for 5rp.\n" 
+            post_params['text'] = ("Play connect four against a bot or friend for 5rp.\n"
                        "To play against a bot, leave out the @mentions.\n"
                        "There are 2 board displays: phone and computer.\n"
                        "You can also say both to have both displays.\n"
                        "Examples: @rb play @friendido phone\n"
                        "@rb play")
-            
+
         elif (reason[0] == 'reddit'):
             post_params['text'] = ("There are 5 reddit commands:\n\n"
                        "toot\n"
@@ -1013,13 +1031,13 @@ def helper_specific(post_params, text):
                        "joke\n"
                        "red_pill\n"
                        "blue_pill\n")
-            
+
         elif (reason[0] == 'word'):
             post_params['text'] = ("There are 3 uses for word:\n\n"
                        "word [#number] \n(shows top # of words for the group)\n"
                        "word [names] [#number] \n(shows top # of words for each person mentioned)\n"
                        "word \n(shows top word for each person)")
-            
+
         elif (reason[0] == 'stats' or reason[0] == 'stat'):
             post_params['text'] = ("There are six stats to lookup:\n\n" +
                        "name\n" +
@@ -1027,13 +1045,13 @@ def helper_specific(post_params, text):
                        "realness\n" +
                        "abilities\n" +
                        "protected")
-            
+
         elif (reason[0] == 'ability' or reason[0] == 'abilities'):
             post_params['text'] = ("There are three abilities to lookup:\n\n" +
                        "protect\n" +
                        "thornmail\n" +
                        "bomb")
-            
+
         elif (reason[0] == 'help'):
             post_params['text'] = ("The help command has 3 uses:\n\n" +
                       "help [command]: find info on how to call commands and what they do\n\n" +
@@ -1056,7 +1074,7 @@ def helper_specific(post_params, text):
             else:
                 post_params['text'] = ("Sorry, that's not an ability for sale"
                            "Did you want protect, thornmail, or bomb?")
-                
+
         elif (reason[0] == 'ability'):
             if (reason[1] == 'protect'):
                 post_params['text'] = ("The protect ability protects you from losing rp")
@@ -1067,19 +1085,19 @@ def helper_specific(post_params, text):
             else:
                 post_params['text'] = ("Sorry, that's not an ability.\n"
                            "Did you want protect, thornmail, or bomb?")
-                
+
         elif (reason[0] == 'very' and reason[1] == 'real'):
             post_params['text'] = ("The very real command is used to reward a user for their excess of realness\n" +
                       "Example: @rb very real Carter")
-            
+
         elif (reason[0] == 'not' and reason[1] == 'real'):
             post_params['text'] = ("The not real command is used to shame a user for their lack of realness\n" +
                       "Example: @rb not real Carter")
-            
+
         elif (reason[0] == 'red' and reason[1] == 'pill'):
             post_params['text'] = ("Gives a random post from r/the_donald\n" +
                       "Example: @rb red pill")
-            
+
         elif (reason[0] == 'blue' or reason[0] == 'pill'):
             post_params['text'] = ("Gives a random post from r/esist\n" +
                       "Example: @rb blue pill")
@@ -1135,7 +1153,7 @@ def very_real(form, post_params):
             post_params['text'] = post_text.obj
             send_message(post_params)
     person.last = datetime.now()
-        
+
 def not_real(form, post_params):
     person = form.ulist.find(form.message.sender_id)
     if person.last > (datetime.now() - timedelta(minutes=15)):
@@ -1162,7 +1180,7 @@ def clear(form, post_params):
     else:
         post_params['text'] = 'Cleared'
         send_message(post_params)
-        
+
 def shop(form, post_params):
     items = ['protect', 'bomb', 'thornmail']
     nonsense = form.findNonsense(items + ['shop'])
@@ -1170,7 +1188,7 @@ def shop(form, post_params):
         post_params['text'] = ("I don't understand " + nonsense.obj + "\n" +
                                "Ex. @rb shop protect 10")
         send_message(post_params)
-        
+
     form.removeCommand('shop')
     product = form.contains(items)
     if (product.success and len(product.obj) == 1):
@@ -1225,10 +1243,10 @@ def format_all(ulist, peoplelist = []):
         return [{'loci': loci, 'type':'mentions', 'user_ids':user_ids}]
 
 def call_all(message, ulist, post_params):
-    
+
     if (('@all' not in message.text) and ('@everyone' not in message.text)):
         return False
-    
+
     post_params['attachments'] = format_all(ulist)
     post_params['text'] = message.text
     send_message(post_params)
@@ -1244,7 +1262,7 @@ def play(ulist, user_id, user_name, user2_id = '', user2_name = '', print_type =
         ulist.find(user_id).add_realness(5)
     elif outcome == "win2":
         ulist.find(user2_id).add_realness(5)
-        
+
 def joke(post_params, red):
     try:
         text = red.joke()
@@ -1260,7 +1278,7 @@ def toot(post_params, red):
         text = "toot"
     post_params['text'] = text
     send_message(post_params)
-    
+
 def meme(post_params, red):
     try:
         text = red.meme().split('||')
@@ -1268,7 +1286,7 @@ def meme(post_params, red):
         post_params['text'] = "meme"
         send_message(post_params)
         return
-        
+
     post_params['text'] = text[0]
     try:
         post_params['attachments'] = [{'type': 'image', 'url': text[1]}]
@@ -1276,7 +1294,7 @@ def meme(post_params, red):
         post_params['attachments'] = []
     except:
         send_message(post_params)
-        
+
 def idea(post_params, text):
     rest = text.split('idea')
     if len(rest) == 1:
@@ -1284,7 +1302,7 @@ def idea(post_params, text):
         send_message(post_params)
     else:
         idea_write(rest[1])
-        
+
 
 def blue_pill(post_params, red):
     try:
@@ -1298,8 +1316,8 @@ def blue_pill(post_params, red):
         post_params['attachments'] = []
     else:
         send_message(post_params)
-    
-    
+
+
 def red_pill(post_params, red):
     try:
         text = red.red_pill().split('||')
@@ -1312,7 +1330,7 @@ def red_pill(post_params, red):
         post_params['attachments'] = []
     else:
         send_message(post_params)
-        
+
 def games(form, post_params, timerlist):
     nonsense = form.findNonsense(['games'])
     if nonsense.success:
@@ -1320,7 +1338,7 @@ def games(form, post_params, timerlist):
                                "Ex. @rb games @Employed Degenerate 10 or\n" +
                                "@rb games")
         send_message(post_params)
-    
+
     people = []
     if len(form.people) > 0:
         people = form.people
@@ -1348,13 +1366,13 @@ def games(form, post_params, timerlist):
     post_params['attachments'] = format_all(form.ulist, people)
     send_message(post_params)
     post_params['attachments'] = []
-        
+
 def games_reply(user_id, text, post_params, timerlist):
     if text.startswith("yes"):
         timerlist.games_answer(user_id, True, post_params)
     else:
         timerlist.games_answer(user_id, False, post_params)
-            
+
 def evaluate(post_params, form, group_id):
     if len(form.numbers) > 1:
         post_params['text'] = "Too many numbers, just 1 please."
@@ -1383,7 +1401,7 @@ def evaluate(post_params, form, group_id):
                 word_list += evaluator.mostCommonWordForPerson(user, form.numbers[0])
             post_params['text'] = ''
             for word in word_list:
-                post_params['text'] += word[0] + ":\n" 
+                post_params['text'] += word[0] + ":\n"
                 for tup in word[1]:
                     post_params['text'] += tup[1] + '  ' + str(tup[0]) + "\n"
                 post_params['text'] += "\n"
@@ -1404,19 +1422,61 @@ def evaluate(post_params, form, group_id):
             word_list += evaluator.mostCommonWordForPerson(user, 10)
         post_params['text'] = ''
         for word in word_list:
-            post_params['text'] += word[0] + ":\n" 
+            post_params['text'] += word[0] + ":\n"
             for tup in word[1]:
                 post_params['text'] += tup[1] + '  ' + str(tup[0]) + "\n"
             post_params['text'] += "\n"
         send_message(post_params)
 
-        
+def create_graph(userlist, request_params, post_params):
+    df = pd.read_json(os.path.abspath('realness_stat.json'), orient='records').transpose().groupby(pd.Grouper(freq='d')).last()
+    data=[]
+    for column in df.columns:
+        obj = go.Scatter(x=df.index,
+                    y=df[column],
+                    mode='lines',
+                    name=userlist.find(str(column)).name.capitalize())
+        data.append(obj)
+    layout = go.Layout(title='Realness',
+                        titlefont=dict(family='Comic Sans MS', size=30),
+                        xaxis=dict(title='Date',
+                                    titlefont=dict(family='Comic Sans MS'),
+                                    gridcolor='rgb(255,255,255)'),
+                        yaxis=dict(title='Realness Level',
+                                    titlefont=dict(family='Comic Sans MS'),
+                                    gridcolor='rgb(255,255,255)',
+                                    showgrid=True,
+                                    showticklabels=True,
+                                    tickcolor='rgb(255,255,255)',
+                                    ticks='outside',
+                                    zeroline=True,
+                                    rangemode='tozero'),
+                                plot_bgcolor='rgb(229,229,229)',
+                                paper_bgcolor='rgb(255,255,255)')
+
+    fig = go.Figure(data=data,layout=layout)
+    ImageData = plotly.plotly.image.get(fig,'png')
+    imgurl = upload_image(request_params, ImageData=ImageData)
+    post_params['text'] = 'GRAPH REEEEEEEEEEEEEE'
+    post_params['attachments'] = [{"type":"image","url":imgurl}]
+    send_message(post_params)
+    post_params['attachments']=[]
+
+def reee(post_params):
+    """Returns angry frog gif"""
+    post_params['text'] = 'REEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE'
+    post_params['attachments']=[{"type":"image","url":"https://i.groupme.com/828x828.gif.0587229f90fa489187bdc94f3d74d231.large"}]
+    send_message(post_params)
+    post_params['attachments']=[]
+
 #checks for last message and runs commands
 def commands(message, ulist, post_params, timerlist, request_params, group_id, red):
     if message.text == None:
         return
     form = Formatter(message, ulist)
     text = form.text
+    if 'reee' in text:
+        reee(post_params)
     if text.startswith('here'):
         timerlist.cancel_timer(message.user_id, post_params)
     elif text.startswith('yes') or text.startswith('no'):
@@ -1426,12 +1486,12 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
     elif (text == '@rb'):
         helper_main(post_params)
     elif (text.startswith('@rb ')):
-            
+
             form.replaceMentions()
             form.removeBotCall()
-            
+
             text = form.text
-            
+
             #do not completely remove people references in text for these
             #Position of the references are important
             if text.startswith('very real'):
@@ -1441,7 +1501,7 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
             elif text.startswith('not real'):
                 not_real(form, post_params)
                 return
-            
+
             #remove mentions first, allows for less f-ups
             form.removePeople()
             form.findNumbers()
@@ -1454,7 +1514,7 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
 
             elif (text.startswith("help")):
                 helper_specific(post_params, text)
-                
+
             elif (text.startswith('reward')):
                 form.sender.daily_reward(post_params)
 
@@ -1463,37 +1523,37 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
 
             elif (text.startswith('shop')):
                 shop(form, post_params)
-                
+
             elif (text == 'joke'):
                 joke(post_params, red)
-                
+
             elif (text == 'toot'):
                 toot(post_params, red)
-                
+
             elif (text == 'meme'):
                 meme(post_params, red)
-                
+
             elif (text == 'idea'):
                 idea(post_params, text)
-            
+
             elif (text in ['red pill', 'redpill', 'red_pill']):
                 red_pill(post_params, red)
-                
+
             elif (text in ['blue pill', 'bluepill', 'blue_pill']):
                 blue_pill(post_params, red)
-                
+
             elif (text.startswith('games')):
                 games(form, post_params, timerlist)
-            
+
             elif (text.startswith('word') or text.startswith('words')):
                 evaluate(post_params, form, group_id)
-            
+
             elif (text.startswith('use')):
                 form.sender.use_ability(form, post_params)
-            
+
             elif (text == 'clear'):
                 clear(form, post_params)
-            
+
             elif (text.startswith('play')):
                 t = text.split(' ')
                 if len(t) == 1 or len(t) == 2:
@@ -1538,6 +1598,9 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
             elif (len(text.split(' ')) == 2 and text.split(' ')[0] in ulist.names):
                 rest = text.split(' ')
                 ulist.findByName(rest[0]).value(rest[1])
+
+            elif (text == 'graph'):
+                create_graph(ulist, request_params, post_params)
             else:
                 helper_main(post_params)
 
@@ -1546,7 +1609,7 @@ def run(request_params, post_params, timerlist, group_id, userlist, red, word_di
     while (1 == True):
         read_messages(request_params, group_id, userlist, post_params, timerlist, red, word_dict, testmode)
 
-        timerlist.check(post_params)    
+        timerlist.check(post_params)
 
         time.sleep(1)
 
@@ -1556,6 +1619,7 @@ def startup(testmode = False, shouldrun = True):
     userlist = UserList(user_dict)
     red = Reddit()
     auth = auth_load()
+    bot_auth = read_auth()
     bot = auth['equipo']
     if testmode:
         bot = auth['test']
@@ -1564,6 +1628,9 @@ def startup(testmode = False, shouldrun = True):
     request_params = {'token':auth['token']}
     post_params = {'text':'','bot_id':bot['bot_id'],'attachments':[]}
     timerlist = TimerList()
+    plotly.tools.set_credentials_file(username=bot_auth['plotlyuser'],api_key=bot_auth['plotlykey'])
+    plotly.tools.set_config_file(world_readable=False,
+                                 sharing='private')
     text = 'The current realness levels are: \n'
     for user in sorted(userlist.ulist, key=lambda x: x.realness):
         text += user.nickname +': ' + str(user.realness) + '\n'
