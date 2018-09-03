@@ -1451,7 +1451,7 @@ def create_graph(userlist, request_params, post_params):
                         showlegend=True,
                         legend=dict(x=0,
                                     y=1,
-                                    bgcolor='rgb(229,229,229)')
+                                    bgcolor='rgb(229,229,229)'),
                                 plot_bgcolor='rgb(229,229,229)',
                                 paper_bgcolor='rgb(255,255,255)')
 
