@@ -1435,15 +1435,12 @@ def create_graph(userlist, request_params, post_params):
         obj = go.Scatter(x=df.index,
                     y=df[column],
                     mode='lines',
-                    name=userlist.find(str(column)).name.capitalize())
+                    name=userlist.find(str(column)).nickname)
         data.append(obj)
     layout = go.Layout(title='Realness',
-                        titlefont=dict(family='Comic Sans MS', size=30),
                         xaxis=dict(title='Date',
-                                    titlefont=dict(family='Comic Sans MS'),
                                     gridcolor='rgb(255,255,255)'),
                         yaxis=dict(title='Realness Level',
-                                    titlefont=dict(family='Comic Sans MS'),
                                     gridcolor='rgb(255,255,255)',
                                     showgrid=True,
                                     showticklabels=True,
@@ -1451,6 +1448,10 @@ def create_graph(userlist, request_params, post_params):
                                     ticks='outside',
                                     zeroline=True,
                                     rangemode='tozero'),
+                        showlegend=True,
+                        legend=dict(x=0,
+                                    y=1,
+                                    bgcolor='rgb(229,229,229)')
                                 plot_bgcolor='rgb(229,229,229)',
                                 paper_bgcolor='rgb(255,255,255)')
 
