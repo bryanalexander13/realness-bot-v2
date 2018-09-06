@@ -29,9 +29,12 @@ def send_message(post_params):
 def read():
     global group
     global request_params
-    response_messages = requests.get('https://api.groupme.com/v3/groups/'+ group +'/messages', params = request_params).json()['response']['messages']
-    return response_messages
-
+    try:
+        response_messages = requests.get('https://api.groupme.com/v3/groups/'+ group +'/messages', params = request_params).json()['response']['messages']
+        return response_messages
+    except:
+        return read()
+    
 class Player:
     """
     """

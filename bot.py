@@ -11,6 +11,8 @@ from collections import defaultdict
 import pandas as pd
 import plotly
 import plotly.graph_objs as go
+import traceback
+import _thread as thread
 
 
 class User:
@@ -142,18 +144,9 @@ class User:
     def ability_read(self):
         self.abilities = [Ability(i[0],i[1]) for i in self.abilities]
 
-    def value(self, val, post_params):
-        if val not in self.properties or val == 'user_id':
-            post_params['text'] = ("The properties are:\n" +
-                                    "name\n" +
-                                    "nickname\n" +
-                                    "realness\n" +
-                                    "abilities\n" +
-                                    "protected")
-            send_message(post_params)
-        else:
-            post_params['text'] = str(self.__dict__()[val])
-            send_message(post_params)
+    def value(self, val):
+        return str(self.__dict__()[val])
+
 
     def adjustRealness(self, form, reason, post_params, multiplier = 1):
         if (form.message.sender_id == self.user_id):
@@ -262,6 +255,20 @@ class UserList:
         else:
             return ReturnObject(False, "Sorry, only admins have this ability")
 
+    def returnAttribute(self, form, attributes, post_params):
+        out = ''
+        if len(form.people) > 0:
+            for user in form.people:
+                out += user.nickname + ":\n"
+                for att in attributes:
+                    out += att + "- " + user.value(att) + "\n"
+                out += "\n"
+        else:
+            out += form.sender.nickname + ":\n"
+            for att in attributes:
+                out += att + "- " + form.sender.value(att) + "\n"
+        post_params['text'] = out
+        send_message(post_params)
 
 class Timer:
 
@@ -860,7 +867,7 @@ def members(request_params, group_id):
 def upload_image(request_params, filename=None,ImageData=None):
     """Uploads image file or image data (binary) to GroupMe Image Service.  Returns url."""
     if filename is not None:
-        with open(os.path.abspath(fp), 'rb') as pic:
+        with open(os.path.abspath(filename), 'rb') as pic:
             ImageData = pic.read()
     url = requests.post('https://image.groupme.com/pictures', params=request_params , data=ImageData).json()['payload']['url']
     return url
@@ -869,6 +876,18 @@ def send_message(post_params):
     """Sends message to group.
     :param dict post_params: bot_id, text required"""
     requests.post("https://api.groupme.com/v3/bots/post", json = post_params)
+
+def parse_message(request_params, group_id, ulist, post_params, timerlist, red, word_dict, testmode, mess):
+    if not testmode:
+        update_everyone(request_params, group_id, ulist)
+    commands(mess, ulist, post_params, timerlist, request_params, group_id, red)
+    if not testmode and mess.text is not None:
+        users_write(ulist)
+        form = Formatter(mess, ulist)
+        form.replaceMentions()
+        form.removeBotCall()
+        word_dict.add(mess.sender_id, form.text)
+        word_dict.realness()
 
 #reads messages and creates message_list of Message objects
 def read_messages(request_params, group_id, ulist, post_params, timerlist, red, word_dict, testmode):
@@ -881,46 +900,43 @@ def read_messages(request_params, group_id, ulist, post_params, timerlist, red, 
     :param UserList ulist: user list of User objects
     :return list: list of Message objects"""
     try:
-        response_messages = requests.get('https://api.groupme.com/v3/groups/{}/messages'.format(group_id), params = request_params).json()['response']['messages']
-    except:
-        print('connection problem')
-        time.sleep(5)
-        return
-    message_list=[]
-    last = last_load()
-
-    for message in response_messages:
-        if int(message['id']) <= int(last):
-            break
-        mess = Message(message['attachments'],
-                        message['avatar_url'],
-                        message['created_at'],
-                        message['favorited_by'],
-                        message['group_id'],
-                        message['id'],
-                        message['name'],
-                        message['sender_id'],
-                        message['sender_type'],
-                        message['source_guid'],
-                        message['system'],
-                        message['text'],
-                        message['user_id'])
-        message_list.append(mess)
-
-        if mess.sender_type == 'bot' or mess.sender_type == 'system':
-            continue
-        else:
-            if not testmode:
-                update_everyone(request_params, group_id, ulist)
-            commands(mess, ulist, post_params, timerlist, request_params, group_id, red)
-            if not testmode and mess.text is not None:
-                users_write(ulist)
-                form = Formatter(mess, ulist)
-                form.replaceMentions()
-                form.removeBotCall()
-                word_dict.add(mess.sender_id, form.text)
-                word_dict.realness()
-
+        try:
+            response_messages = requests.get('https://api.groupme.com/v3/groups/{}/messages'.format(group_id), params = request_params).json()['response']['messages']
+        except:
+            print('connection problem')
+            time.sleep(5)
+            read_messages(request_params, group_id, ulist, post_params, timerlist, red, word_dict, testmode)
+            return
+        message_list=[]
+        last = last_load()
+    
+        for message in response_messages:
+            if int(message['id']) <= int(last):
+                break
+            mess = Message(message['attachments'],
+                            message['avatar_url'],
+                            message['created_at'],
+                            message['favorited_by'],
+                            message['group_id'],
+                            message['id'],
+                            message['name'],
+                            message['sender_id'],
+                            message['sender_type'],
+                            message['source_guid'],
+                            message['system'],
+                            message['text'],
+                            message['user_id'])
+            message_list.append(mess)
+    
+            if mess.sender_type == 'bot' or mess.sender_type == 'system':
+                continue
+            else:
+                thread.start_new_thread(parse_message, (request_params, group_id, ulist, post_params, timerlist, red, word_dict, testmode, mess))
+    except Exception:
+        print(traceback.format_exc())
+        post_params['text'] = "Sorry, something went wrong. Try again, it could just have been a read failure."
+        send_message(post_params)
+        
     if len(message_list) > 0:
         last_write(message_list[0].id)
 
@@ -1152,7 +1168,8 @@ def very_real(form, post_params):
         if (post_text.success):
             post_params['text'] = post_text.obj
             send_message(post_params)
-    person.last = datetime.now()
+        person.last = datetime.now()
+    
 
 def not_real(form, post_params):
     person = form.ulist.find(form.message.sender_id)
@@ -1170,7 +1187,7 @@ def not_real(form, post_params):
         if (post_text.success):
             post_params['text'] = post_text.obj
             send_message(post_params)
-    person.last = datetime.now()
+        person.last = datetime.now()
 
 def clear(form, post_params):
     result = form.ulist.clearRealness(form.sender.user_id)
@@ -1193,7 +1210,6 @@ def shop(form, post_params):
     product = form.contains(items)
     if (product.success and len(product.obj) == 1):
         person = form.sender
-        form.findNumbers()
         numbers = form.numbers
         if (len(numbers) == 1):
             if product.obj[0] in ['protect', 'bomb']:
@@ -1511,9 +1527,9 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
         reee(post_params)
     if 'here' in text:
         timerlist.cancel_timer(message.user_id, post_params)
-    elif any(word in text for word in ['yes','yah','yeah', 'yea', 'ya']):
+    elif any(word in form.split for word in ['yes','yah','yeah', 'yea', 'ya']):
         games_reply(message.user_id, text, post_params, timerlist, 'yes')
-    elif any(word in text for word in ['no','nah','nope']):
+    elif any(word in form.split for word in ['no','nah','nope']):
         games_reply(message.user_id, text, post_params, timerlist, 'no')
     elif call_all(message, ulist, post_params):
         return
@@ -1549,7 +1565,7 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
             elif (text.startswith("help")):
                 helper_specific(post_params, text)
 
-            elif (text.startswith('reward')):
+            elif (text.startswith('reward') and len(form.people) == 0):
                 form.sender.daily_reward(post_params)
 
             elif (text.startswith('here')):
@@ -1591,28 +1607,15 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
             elif (text.startswith('play')):
                 play_game(form, post_params)
 
-            elif (text.lower().startswith('@') and message.attachments != []):
-                user = message.attachments[0]['user_ids']
-                if len(user) > 1:
-                    post_params['text'] = "One person at a time please"
-                    send_message(post_params)
-                else:
-                    loc = message.attachments[0]['loci'][0]
-                    rest = text[(loc[0] + loc[1]) - 3 : ]
-                    rest = rest.strip().split(' ')
-                    if (len(rest) < 1):
-                        post_params['text'] = "This call should look like:\n @rb @LusciousBuck abilities"
-                        send_message(post_params)
-                    else:
-                        ulist.find(user[0]).value(rest[0], post_params)
-            elif (len(text.split(' ')) == 2 and text.split(' ')[0] in ulist.names):
-                rest = text.split(' ')
-                ulist.findByName(rest[0]).value(rest[1])
-
             elif (text == 'graph'):
                 create_graph(ulist, request_params, post_params)
+            
             else:
-                helper_main(post_params)
+                attributes = form.contains(form.sender.properties)
+                if attributes.success:
+                    form.ulist.returnAttribute(form, attributes.obj, post_params)
+                else:
+                    helper_main(post_params)
 
 
 def run(request_params, post_params, timerlist, group_id, userlist, red, word_dict, testmode):
@@ -1650,4 +1653,4 @@ def startup(testmode = False, shouldrun = True):
 
 
 if __name__ == "__main__":
-    startup(True)
+    startup()
