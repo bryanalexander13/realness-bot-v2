@@ -1455,24 +1455,17 @@ def create_graph(userlist, request_params, post_params):
         data.append(obj)
     layout = go.Layout(title='Realness',
                         xaxis=dict(title='Date',
-                                    gridcolor='rgb(255,255,255)',
-                                    tickmode="auto",
-                                    nticks=20,
-                                    ticks="inside",
-                                    range=[str(datetime.date(df.index[0])),
-                                            str(datetime.date(df.index[-1]+pd.DateOffset(1)))]),
+                                    gridcolor='rgb(255,255,255)'),
                         yaxis=dict(title='Realness Level',
                                     gridcolor='rgb(255,255,255)',
                                     showgrid=True,
                                     showticklabels=True,
+                                    tickcolor='rgb(255,255,255)',
                                     ticks='outside',
                                     zeroline=True,
-                                    rangemode='tozero',
-                                    tickmode="auto",
-                                    ticks="inside",
-                                    tickcolor='rgb(0,0,0)'),
+                                    rangemode='tozero'),
                         showlegend=True,
-                        legend=dict(x=.05,
+                        legend=dict(x=0,
                                     y=1,
                                     bgcolor='rgb(229,229,229)'),
                                 plot_bgcolor='rgb(229,229,229)',
@@ -1492,7 +1485,7 @@ def reee(post_params):
     post_params['attachments']=[{"type":"image","url":"https://i.groupme.com/828x828.gif.0587229f90fa489187bdc94f3d74d231.large"}]
     send_message(post_params)
     post_params['attachments']=[]
-
+    
 def play_game(form, post_params):
     nonsense = form.findNonsense(['play', 'phone', 'computer', 'both'])
     if nonsense.success:
@@ -1500,7 +1493,7 @@ def play_game(form, post_params):
                                "Ex. @rb play @Employed Degenerate or\n" +
                                "@rb play")
         send_message(post_params)
-
+    
     player2 = ''
     player2_name = ''
     player1 = form.sender.user_id
@@ -1521,7 +1514,7 @@ def play_game(form, post_params):
         mode = mode.obj[0]
     else:
         mode = 'phone'
-
+        
     play(form.ulist, player1, player1_name, player2, player2_name, mode)
 
 #checks for last message and runs commands
