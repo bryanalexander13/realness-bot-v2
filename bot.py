@@ -909,7 +909,7 @@ def read_messages(request_params, group_id, ulist, post_params, timerlist, red, 
             return
         message_list=[]
         last = last_load()
-    
+
         for message in response_messages:
             if int(message['id']) <= int(last):
                 break
@@ -927,7 +927,7 @@ def read_messages(request_params, group_id, ulist, post_params, timerlist, red, 
                             message['text'],
                             message['user_id'])
             message_list.append(mess)
-    
+
             if mess.sender_type == 'bot' or mess.sender_type == 'system':
                 continue
             else:
@@ -936,7 +936,7 @@ def read_messages(request_params, group_id, ulist, post_params, timerlist, red, 
         print(traceback.format_exc())
         post_params['text'] = "Sorry, something went wrong. Try again, it could just have been a read failure."
         send_message(post_params)
-        
+
     if len(message_list) > 0:
         last_write(message_list[0].id)
 
@@ -1169,7 +1169,7 @@ def very_real(form, post_params):
             post_params['text'] = post_text.obj
             send_message(post_params)
         person.last = datetime.now()
-    
+
 
 def not_real(form, post_params):
     person = form.ulist.find(form.message.sender_id)
@@ -1455,17 +1455,24 @@ def create_graph(userlist, request_params, post_params):
         data.append(obj)
     layout = go.Layout(title='Realness',
                         xaxis=dict(title='Date',
-                                    gridcolor='rgb(255,255,255)'),
+                                    gridcolor='rgb(255,255,255)',
+                                    tickmode="auto",
+                                    nticks=20,
+                                    ticks="inside",
+                                    range=[str(datetime.date(df.index[0])),
+                                            str(datetime.date(df.index[-1]+pd.DateOffset(1)))]),
                         yaxis=dict(title='Realness Level',
                                     gridcolor='rgb(255,255,255)',
                                     showgrid=True,
                                     showticklabels=True,
-                                    tickcolor='rgb(255,255,255)',
-                                    ticks='outside',
                                     zeroline=True,
-                                    rangemode='tozero'),
+                                    rangemode='tozero',
+                                    tickmode="auto",
+                                    ticks="inside",
+                                    tickcolor='rgb(0,0,0)'),
                         showlegend=True,
-                        legend=dict(x=0,
+
+                        legend=dict(x=.05,
                                     y=1,
                                     bgcolor='rgb(229,229,229)'),
                                 plot_bgcolor='rgb(229,229,229)',
@@ -1485,7 +1492,7 @@ def reee(post_params):
     post_params['attachments']=[{"type":"image","url":"https://i.groupme.com/828x828.gif.0587229f90fa489187bdc94f3d74d231.large"}]
     send_message(post_params)
     post_params['attachments']=[]
-    
+
 def play_game(form, post_params):
     nonsense = form.findNonsense(['play', 'phone', 'computer', 'both'])
     if nonsense.success:
@@ -1493,7 +1500,7 @@ def play_game(form, post_params):
                                "Ex. @rb play @Employed Degenerate or\n" +
                                "@rb play")
         send_message(post_params)
-    
+
     player2 = ''
     player2_name = ''
     player1 = form.sender.user_id
@@ -1514,7 +1521,7 @@ def play_game(form, post_params):
         mode = mode.obj[0]
     else:
         mode = 'phone'
-        
+
     play(form.ulist, player1, player1_name, player2, player2_name, mode)
 
 #checks for last message and runs commands
@@ -1609,7 +1616,7 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
 
             elif (text == 'graph'):
                 create_graph(ulist, request_params, post_params)
-            
+
             else:
                 attributes = form.contains(form.sender.properties)
                 if attributes.success:
@@ -1653,4 +1660,4 @@ def startup(testmode = False, shouldrun = True):
 
 
 if __name__ == "__main__":
-    startup()
+    startup(True)
