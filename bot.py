@@ -1496,6 +1496,13 @@ def reee(post_params):
     send_message(post_params)
     post_params['attachments']=[]
 
+def weed(post_params):
+    """Sends MAD MUSK with WEED"""
+    post_params['text']=[]
+    post_params['attachments']=[{"type":"image","url":"https://i.groupme.com/480x270.gif.37dd89552d064e3c83c7e4213eb9229a"}]
+    send_message(post_params)
+    post_params['attachments']=[]
+
 def play_game(form, post_params):
     nonsense = form.findNonsense(['play', 'phone', 'computer', 'both'])
     if nonsense.success:
@@ -1535,6 +1542,8 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
     text = form.text
     if 'reee' in text:
         reee(post_params)
+    if any(x in text for x in ['weed','dwl','W E E D']):
+        weed(post_params)
     if 'here' in text:
         timerlist.cancel_timer(message.user_id, post_params)
     elif any(word in form.split for word in ['yes','yah','yeah', 'yea', 'ya']):
