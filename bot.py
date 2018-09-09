@@ -190,8 +190,11 @@ class UserList:
         self.ids = {i.user_id:i for i in self.ulist}
         self.names = {i.name:i for i in self.ulist}
         self.nicknames = {i.nickname:i for i in self.ulist}
-        self.realnesses = {i.user_id:i.realness for i in self.ulist}
+        #self.realnesses = {i.user_id:i.realness for i in self.ulist}
         self.peopleFinders = [self.find, self.findByName, self.findByNickname]
+
+    def realnesses(self):
+        return {i.user_id:i.realness for i in self.ulist}
 
     def find(self, user_id):
         try:
@@ -470,7 +473,7 @@ class Recorder:
             self.realness_stat = realness_stat
 
     def realness(self):
-        self.realness_stat[str(datetime.now())] = self.ulist.realnesses
+        self.realness_stat[str(datetime.now())] = self.ulist.realnesses()
         self.record_realness()
 
     def record_realness(self):
