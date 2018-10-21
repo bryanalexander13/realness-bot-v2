@@ -788,31 +788,31 @@ class Group:
     def __init__(self, dic):
         self.creator = dic['creator']
         self.group = dic['group']
-    
+
     def __dict__(self):
         return {'creator':self.creator, 'group':self.group}
-    
+
 
 class Groups:
-    
-    def __init__(self, testmode):   
+
+    def __init__(self, testmode):
         self.testmode = testmode
         self.group_dict = {}
         self.readGroups()
-        
+
     def readGroups(self):
         try:
             with open(os.path.abspath('groups.json'),'r') as s:
                 file = s.readlines()
                 read_dict = json.loads(file[0])
                 for item in read_dict:
-                    self.group_dict[item] = Group(read_dict[item]) 
+                    self.group_dict[item] = Group(read_dict[item])
                 s.close()
         except Exception:
             print(traceback.format_exc())
             time.sleep(5)
             return self.readGroups()
-    
+
     def writeGroups(self):
         if self.testmode:
             return
@@ -827,24 +827,24 @@ class Groups:
             print(traceback.format_exc())
             time.sleep(5)
             return self.writeGroups()
-        
+
     def addToAll(self, person):
         self.group_dict['all'].group += [person]
         self.writeGroups()
-        
+
     def addGroup(self, group_name, group):
         if group_name in self.group_dict:
             return False
         else:
             self.group_dict[group_name] = group
             return True
-         
+
     def makeGroup(self, form):
         ids = []
         for user in set(form.people):
             ids += [user.user_id]
         return self.addGroup(form.split[0], Group({"creator":form.sender.user_id, "group":ids}))
-            
+
     def createGroup(self, form, post_params):
         form.removeCommand('make group')
         form.removeCommand('makegroup')
@@ -867,13 +867,13 @@ class Groups:
             else:
                 post_params['text'] = 'That group already exists'
                 send_message(post_params)
-    
+
     def addPeople(self, form, group):
         people = self.group_dict[group].group
         for person in set(form.people):
             people += [person.user_id]
         self.group_dict[group].group = people
-    
+
     def addToGroup(self, form, post_params):
         form.removeCommand('add to group')
         form.removeCommand('add to')
@@ -897,14 +897,14 @@ class Groups:
             self.writeGroups()
             post_params['text'] = "Added to group " + form.split[0]
             send_message(post_params)
-            
+
     def findPeople(self, group, ulist):
         people = self.group_dict[group].group
         names = ''
         for person in people:
             names += ulist.find(person).nickname + ', '
         return names[:-2]
-            
+
     def peopleInGroup(self, form, ulist, post_params):
         form.removeCommand('people')
         if len(form.split) > 1:
@@ -920,27 +920,27 @@ class Groups:
             people = self.findPeople(form.split[0], ulist)
             post_params['text'] = form.split[0] + " contains: " + people
             send_message(post_params)
-        
+
     def findAllGroups(self):
         all_groups = ''
         for group in self.group_dict:
             all_groups += group + ', '
         return all_groups[:-2]
-    
+
     def findGroups(self, post_params):
         groups = self.findAllGroups()
         post_params['text'] = 'The groups are: ' + groups
         send_message(post_params)
-        
+
     def findGroup(self, key):
         if key in self.group_dict:
             return ReturnObject(True, self.group_dict[key])
         else:
             return ReturnObject(False)
-        
+
     def findMentions(self, text):
         return re.findall(r'@\w+', text)
-    
+
     def findIds(self, text):
         mentions = self.findMentions(text)
         ids = []
@@ -948,7 +948,7 @@ class Groups:
             group = self.findGroup(mention[1:])
             if group.success:
                 ids += group.obj.group
-        return ids           
+        return ids
 
     def formMentions(self, form, ulist):
         text = form.text
@@ -961,7 +961,7 @@ class Groups:
             loci += [[0,1]]
             user_ids += [person]
         return ReturnObject(True, [{'loci': loci, 'type':'mentions', 'user_ids':user_ids}])
-    
+
     def sendMention(self, form, ulist, post_params):
         mentions = self.formMentions(form, ulist)
         if mentions.success:
@@ -972,10 +972,10 @@ class Groups:
             return True
         else:
             return False
-        
+
     def removeGroup(self, key):
         del self.group_dict[key]
-        
+
     def removePeopleFromGroup(self, key, id_list):
         people = self.group_dict[key].group
         for user_id in id_list:
@@ -984,10 +984,10 @@ class Groups:
             except:
                 continue
         self.group_dict[key].group = people
-        
+
     def retrieveGroup(self, form):
         return form.contains(self.group_dict.keys())
-        
+
     def remove(self, form, post_params):
         key = self.retrieveGroup(form)
         if not key.success:
@@ -1013,7 +1013,7 @@ class Groups:
         self.removePeopleFromGroup(key, id_list)
         post_params['text'] = "Removed members"
         send_message(post_params)
-            
+
 
 def myconverter(o):
     if isinstance(o, datetime.datetime):
@@ -1676,11 +1676,11 @@ def create_graph(userlist, request_params, post_params):
                                     tickcolor='rgb(0,0,0)'),
                         showlegend=True,
 
-                        legend=dict(x=.05,
-                                    y=1,
-                                    bgcolor='rgb(229,229,229)'),
-                                plot_bgcolor='rgb(229,229,229)',
-                                paper_bgcolor='rgb(255,255,255)')
+                        legend=dict(orientation='h',
+                                y=1.15,
+                                x=0,),
+                        plot_bgcolor='rgb(229,229,229)',
+                        paper_bgcolor='rgb(255,255,255)')
 
     fig = go.Figure(data=data,layout=layout)
     ImageData = plotly.plotly.image.get(fig,'png')
@@ -1829,19 +1829,19 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
 
             elif (text == 'graph'):
                 create_graph(ulist, request_params, post_params)
-                
+
             elif (text.startswith('add group') or text.startswith('addgroup') or text.startswith('make group') or text.startswith('makegroup')):
                 groups.createGroup(form, post_params)
-            
+
             elif (text.startswith('add to group') or text.startswith('add to')):
                 groups.addToGroup(form, post_params)
-                
+
             elif (text.startswith('people')):
                 groups.peopleInGroup(form, ulist, post_params)
-                
+
             elif (text == 'groups'):
                 groups.findGroups(post_params)
-                
+
             elif (text.startswith('remove') or text.startswith('delete')):
                 groups.remove(form, post_params)
 
