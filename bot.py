@@ -13,7 +13,7 @@ import plotly
 import plotly.graph_objs as go
 import traceback
 import _thread as thread
-
+import re
 
 class User:
     """Users information"""
@@ -109,20 +109,20 @@ class User:
 
     def daily_reward(self, post_params):
         if self.reward <= datetime.now() - timedelta(days=1):
-            ran = random.randint(0,9)
-            if ran > 0:
-                rew = max(min(round(abs(random.gauss(0,4))), 10), 1)
+            ran = random.randint(0,10000)
+            if ran > 36:
+                rew = max(min(round((random.gauss(2,1))), 5), 1)
                 self.add_realness(rew)
                 post_params['text'] = "You got " + str(rew) + "rp"
                 send_message(post_params)
             else:
                 ran = random.randint(0,2)
                 if ran == 0:
-                    ab = Ability('protect', max(min(round(abs(random.gauss(3,1))), 3), 1))
+                    ab = Ability('protect', max(min(round((random.gauss(3,1))), 3), 1))
                 elif ran == 1:
-                    ab = Ability('thornmail', max(min(round(abs(random.gauss(3,1))), 3), 1))
+                    ab = Ability('thornmail', max(min(round((random.gauss(3,1))), 3), 1))
                 elif ran == 2:
-                    ab = Ability('bomb', max(min(round(abs(random.gauss(3,1))), 3), 1))
+                    ab = Ability('bomb', max(min(round((random.gauss(3,1))), 3), 1))
                 self.add_ability(ab)
                 post_params['text'] = "You got a " + ab.type + " " + str(ab.val)
                 send_message(post_params)
@@ -510,7 +510,7 @@ class Recorder:
                 self.word_dict = json.loads(file[0])
                 s.close()
         except:
-            self.word_dict = {}
+            self.read_dict()
 
 
 
@@ -567,7 +567,7 @@ class Message:
 
 class ReturnObject:
     def __init__(self, success = False, obj = None):
-        self. success = success
+        self.success = success
         self.obj = obj
 
 
@@ -784,6 +784,236 @@ class Formatter:
         else:
             return ReturnObject(False)
 
+class Group:
+    def __init__(self, dic):
+        self.creator = dic['creator']
+        self.group = dic['group']
+    
+    def __dict__(self):
+        return {'creator':self.creator, 'group':self.group}
+    
+
+class Groups:
+    
+    def __init__(self, testmode):   
+        self.testmode = testmode
+        self.group_dict = {}
+        self.readGroups()
+        
+    def readGroups(self):
+        try:
+            with open(os.path.abspath('groups.json'),'r') as s:
+                file = s.readlines()
+                read_dict = json.loads(file[0])
+                for item in read_dict:
+                    self.group_dict[item] = Group(read_dict[item]) 
+                s.close()
+        except Exception:
+            print(traceback.format_exc())
+            time.sleep(5)
+            return self.readGroups()
+    
+    def writeGroups(self):
+        if self.testmode:
+            return
+        write_dict = {}
+        for item in self.group_dict:
+            write_dict[item] = self.group_dict[item].__dict__()
+        try:
+            with open(os.path.abspath('groups.json'),'w') as s:
+                s.write(json.dumps(write_dict))
+                s.close()
+        except Exception:
+            print(traceback.format_exc())
+            time.sleep(5)
+            return self.writeGroups()
+        
+    def addToAll(self, person):
+        self.group_dict['all'].group += [person]
+        self.writeGroups()
+        
+    def addGroup(self, group_name, group):
+        if group_name in self.group_dict:
+            return False
+        else:
+            self.group_dict[group_name] = group
+            return True
+         
+    def makeGroup(self, form):
+        ids = []
+        for user in set(form.people):
+            ids += [user.user_id]
+        return self.addGroup(form.split[0], Group({"creator":form.sender.user_id, "group":ids}))
+            
+    def createGroup(self, form, post_params):
+        form.removeCommand('make group')
+        form.removeCommand('makegroup')
+        form.removeCommand('add group')
+        form.removeCommand('addgroup')
+        if len(form.split) > 1:
+            post_params['text'] = 'Groups can only a one word name'
+            send_message(post_params)
+        elif len(form.split) < 1 or form.split == ['']:
+            post_params['text'] = "You didn't tell me a group to make"
+            send_message(post_params)
+        elif len(form.people) == 0:
+            post_params['text'] = "You didn't tell me any people to add"
+            send_message(post_params)
+        else:
+            if self.makeGroup(form):
+                self.writeGroups()
+                post_params['text'] = 'Made new group ' + form.split[0]
+                send_message(post_params)
+            else:
+                post_params['text'] = 'That group already exists'
+                send_message(post_params)
+    
+    def addPeople(self, form, group):
+        people = self.group_dict[group].group
+        for person in set(form.people):
+            people += [person.user_id]
+        self.group_dict[group].group = people
+    
+    def addToGroup(self, form, post_params):
+        form.removeCommand('add to group')
+        form.removeCommand('add to')
+        if len(form.split) > 1:
+            post_params['text'] = 'Groups can only a one word name'
+            send_message(post_params)
+        elif len(form.split) < 1 or form.split == ['']:
+            post_params['text'] = "You didn't tell me a group to add to"
+            send_message(post_params)
+        elif len(form.people) == 0:
+            post_params['text'] = "You didn't tell me any people to add"
+            send_message(post_params)
+        elif form.split[0] not in self.group_dict:
+            post_params['text'] = "That is not a group. To make a new group, use @rb make group"
+            send_message(post_params)
+        elif form.sender.user_id != self.group_dict[form.split[0]].creator:
+            post_params['text'] = "Only the creator of the group can add to it"
+            send_message(post_params)
+        else:
+            self.addPeople(form, form.split[0])
+            self.writeGroups()
+            post_params['text'] = "Added to group " + form.split[0]
+            send_message(post_params)
+            
+    def findPeople(self, group, ulist):
+        people = self.group_dict[group].group
+        names = ''
+        for person in people:
+            names += ulist.find(person).nickname + ', '
+        return names[:-2]
+            
+    def peopleInGroup(self, form, ulist, post_params):
+        form.removeCommand('people')
+        if len(form.split) > 1:
+            post_params['text'] = 'Groups can only a one word name'
+            send_message(post_params)
+        elif len(form.split) < 1 or form.split == ['']:
+            post_params['text'] = "You didn't tell me a group to print"
+            send_message(post_params)
+        elif form.split[0] not in self.group_dict:
+            post_params['text'] = "That is not a group"
+            send_message(post_params)
+        else:
+            people = self.findPeople(form.split[0], ulist)
+            post_params['text'] = form.split[0] + " contains: " + people
+            send_message(post_params)
+        
+    def findAllGroups(self):
+        all_groups = ''
+        for group in self.group_dict:
+            all_groups += group + ', '
+        return all_groups[:-2]
+    
+    def findGroups(self, post_params):
+        groups = self.findAllGroups()
+        post_params['text'] = 'The groups are: ' + groups
+        send_message(post_params)
+        
+    def findGroup(self, key):
+        if key in self.group_dict:
+            return ReturnObject(True, self.group_dict[key])
+        else:
+            return ReturnObject(False)
+        
+    def findMentions(self, text):
+        return re.findall(r'@\w+', text)
+    
+    def findIds(self, text):
+        mentions = self.findMentions(text)
+        ids = []
+        for mention in mentions:
+            group = self.findGroup(mention[1:])
+            if group.success:
+                ids += group.obj.group
+        return ids           
+
+    def formMentions(self, form, ulist):
+        text = form.text
+        ids = self.findIds(text)
+        if ids == []:
+            return ReturnObject(False)
+        loci = []
+        user_ids = []
+        for person in ids:
+            loci += [[0,1]]
+            user_ids += [person]
+        return ReturnObject(True, [{'loci': loci, 'type':'mentions', 'user_ids':user_ids}])
+    
+    def sendMention(self, form, ulist, post_params):
+        mentions = self.formMentions(form, ulist)
+        if mentions.success:
+            post_params['attachments'] = mentions.obj
+            post_params['text'] = form.message.text
+            send_message(post_params)
+            post_params['attachments'] = []
+            return True
+        else:
+            return False
+        
+    def removeGroup(self, key):
+        del self.group_dict[key]
+        
+    def removePeopleFromGroup(self, key, id_list):
+        people = self.group_dict[key].group
+        for user_id in id_list:
+            try:
+                people.remove(user_id)
+            except:
+                continue
+        self.group_dict[key].group = people
+        
+    def retrieveGroup(self, form):
+        return form.contains(self.group_dict.keys())
+        
+    def remove(self, form, post_params):
+        key = self.retrieveGroup(form)
+        if not key.success:
+            post_params['text'] = "You didn't give me a group"
+            send_message(post_params)
+            return
+        key = key.obj
+        if len(key) > 1:
+            post_params['text'] = "Only one group at a time"
+            send_message(post_params)
+            return
+        key = key[0]
+        if form.sender.user_id != self.group_dict[key].creator:
+            post_params['text'] = "Only the creator can modify the group"
+            send_message(post_params)
+            return
+        if len(form.people) == 0:
+            self.removeGroup(key)
+            post_params['text'] = key + " has been removed"
+            send_message(post_params)
+            return
+        id_list = [person.user_id for person in form.people]
+        self.removePeopleFromGroup(key, id_list)
+        post_params['text'] = "Removed members"
+        send_message(post_params)
+            
 
 def myconverter(o):
     if isinstance(o, datetime.datetime):
@@ -847,18 +1077,19 @@ def stat_write(stat):
         s.write(stat + '|||')
         s.close()
 
-def update_everyone(request_params, group_id, ulist):
+def update_everyone(request_params, group_id, ulist, groups):
     try:
         group = requests.get('https://api.groupme.com/v3/groups/' +group_id, params = request_params).json()['response']
     except:
         time.sleep(5)
-        update_everyone(request_params, group_id, ulist)
+        update_everyone(request_params, group_id, ulist, groups)
         return
 
     for member in group['members']:
         user = ulist.find(member['user_id'])
         if user.name == 'invalid':
             ulist.add(User(member['user_id'], member['nickname'], member['nickname']))
+            groups.addToAll(member['user_id'])
         else:
             user.nickname = member['nickname']
 
@@ -880,10 +1111,10 @@ def send_message(post_params):
     :param dict post_params: bot_id, text required"""
     requests.post("https://api.groupme.com/v3/bots/post", json = post_params)
 
-def parse_message(request_params, group_id, ulist, post_params, timerlist, red, word_dict, testmode, mess):
+def parse_message(request_params, group_id, ulist, post_params, timerlist, red, word_dict, groups, testmode, mess):
     if not testmode:
-        update_everyone(request_params, group_id, ulist)
-    commands(mess, ulist, post_params, timerlist, request_params, group_id, red)
+        update_everyone(request_params, group_id, ulist, groups)
+    commands(mess, ulist, post_params, timerlist, request_params, group_id, red, groups)
     if not testmode and mess.text is not None:
         users_write(ulist)
         form = Formatter(mess, ulist)
@@ -893,7 +1124,7 @@ def parse_message(request_params, group_id, ulist, post_params, timerlist, red, 
         word_dict.realness()
 
 #reads messages and creates message_list of Message objects
-def read_messages(request_params, group_id, ulist, post_params, timerlist, red, word_dict, testmode):
+def read_messages(request_params, group_id, ulist, post_params, timerlist, red, word_dict, groups, testmode):
     """Reads in messages from GroupMe API through requests.get().
     Converts messages into Message objects. Filters system and bot messages.
     Updates ulist with update method of UserList.  Calls commands().  Calls
@@ -908,7 +1139,7 @@ def read_messages(request_params, group_id, ulist, post_params, timerlist, red, 
         except:
             print('connection problem')
             time.sleep(5)
-            read_messages(request_params, group_id, ulist, post_params, timerlist, red, word_dict, testmode)
+            read_messages(request_params, group_id, ulist, post_params, timerlist, red, word_dict, groups, testmode)
             return
         message_list=[]
         last = last_load()
@@ -934,11 +1165,13 @@ def read_messages(request_params, group_id, ulist, post_params, timerlist, red, 
             if mess.sender_type == 'bot' or mess.sender_type == 'system':
                 continue
             else:
-                thread.start_new_thread(parse_message, (request_params, group_id, ulist, post_params, timerlist, red, word_dict, testmode, mess))
+                #thread.start_new_thread(parse_message, (request_params, group_id, ulist, post_params, timerlist, red, word_dict, groups, testmode, mess))
+                parse_message(request_params, group_id, ulist, post_params, timerlist, red, word_dict, groups, testmode, mess)
     except Exception:
         print(traceback.format_exc())
         post_params['text'] = "Sorry, something went wrong. Try again, it could just have been a read failure."
         send_message(post_params)
+        time.sleep(5)
 
     if len(message_list) > 0:
         last_write(message_list[0].id)
@@ -955,7 +1188,7 @@ def helper_main(post_params, page = 1):
               "help [#page|command]\n"
               "timer [@mention] [time]\n"
               "@all|@everyone\n"
-              "word [names] [number]"),
+              "word [names] [number]\n"),
 
             ("shop [item] [time]\n"
              "use [ability] [time] [@mention]\n"
@@ -1159,8 +1392,8 @@ def add_realness(change_dict, form, post_params):
 
 def very_real(form, post_params):
     person = form.ulist.find(form.message.sender_id)
-    if person.last > (datetime.now() - timedelta(minutes=15)):
-        post_params['text'] = "Sorry, you can only use this once every 15 minutes"
+    if person.last > (datetime.now() - timedelta(minutes=30)):
+        post_params['text'] = "Sorry, you can only use this once every 30 minutes"
     parser = Parser(form)
     result = parser.whoToChange()
     if (not result.success):
@@ -1176,8 +1409,8 @@ def very_real(form, post_params):
 
 def not_real(form, post_params):
     person = form.ulist.find(form.message.sender_id)
-    if person.last > (datetime.now() - timedelta(minutes=15)):
-        post_params['text'] = "Sorry, you can only use this once every 15 minutes"
+    if person.last > (datetime.now() - timedelta(minutes=30)):
+        post_params['text'] = "Sorry, you can only use this once every 30 minutes"
         send_message(post_params)
         return
     parser = Parser(form)
@@ -1230,7 +1463,7 @@ def shop(form, post_params):
                     person.add_ability(Ability(product.obj[0], int(numbers[0])))
                     person.realness -= 15 * int(numbers[0])
 
-                    post_params['text'] = "Ok, 1 " +product.obj[0]+ " ability. That'll last yah " + numbers[0] + ' days.'
+                    post_params['text'] = "Ok, 1 " +product.obj[0]+ " ability. That'll last yah " + str(numbers[0]) + ' days.'
                     send_message(post_params)
                 else:
                     post_params['text'] = 'Fuck off peasant.'
@@ -1247,40 +1480,8 @@ def shop(form, post_params):
         post_params['text'] = "I don't know what ability you want"
         send_message(post_params)
 
-def format_all(ulist, peoplelist = []):
-    loci = []
-    if len(peoplelist) > 0:
-        user_ids = []
-        for i,person in enumerate(peoplelist):
-            loci += [[i,i+1]]
-            user_ids += [person.user_id]
-        return [{'loci': loci, 'type':'mentions', 'user_ids':user_ids}]
-    else:
-        user_ids = list(ulist.ids.keys())
-        for i,person in enumerate(user_ids):
-            loci += [[i,i+1]]
-        return [{'loci': loci, 'type':'mentions', 'user_ids':user_ids}]
-
-def call_all(message, ulist, post_params):
-
-    if (('@all' not in message.text) and ('@everyone' not in message.text)):
-        return False
-
-    post_params['attachments'] = format_all(ulist)
-    post_params['text'] = message.text
-    send_message(post_params)
-    post_params['attachments'] = []
-    return True
-
-
 def play(ulist, user_id, user_name, user2_id = '', user2_name = '', print_type = 'phone'):
-    outcome = play4.play_connect4(user_id, user_name, user2_id, user2_name, print_type)
-    if outcome == "win0":
-        ulist.find(user_id).add_realness(5)
-    elif outcome == "win1":
-        ulist.find(user_id).add_realness(5)
-    elif outcome == "win2":
-        ulist.find(user2_id).add_realness(5)
+    play4.play_connect4(user_id, user_name, user2_id, user2_name, print_type)
 
 def joke(post_params, red):
     try:
@@ -1382,7 +1583,7 @@ def games(form, post_params, timerlist):
                                "@rb games")
         send_message(post_params)
         return
-    post_params['attachments'] = format_all(form.ulist, people)
+    post_params['attachments'] = [{'loci': [[0,5] for person in people], 'type':'mentions', 'user_ids':[person.user_id for person in people]}]
     send_message(post_params)
     post_params['attachments'] = []
 
@@ -1535,7 +1736,7 @@ def play_game(form, post_params):
     play(form.ulist, player1, player1_name, player2, player2_name, mode)
 
 #checks for last message and runs commands
-def commands(message, ulist, post_params, timerlist, request_params, group_id, red):
+def commands(message, ulist, post_params, timerlist, request_params, group_id, red, groups):
     if message.text == None:
         return
     form = Formatter(message, ulist)
@@ -1550,7 +1751,7 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
         games_reply(message.user_id, text, post_params, timerlist, 'yes')
     elif any(word in form.split for word in ['no','nah','nope']):
         games_reply(message.user_id, text, post_params, timerlist, 'no')
-    elif call_all(message, ulist, post_params):
+    elif groups.sendMention(form, ulist, post_params):
         return
     elif (text == '@rb'):
         helper_main(post_params)
@@ -1602,7 +1803,7 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
             elif (text == 'meme'):
                 meme(post_params, red)
 
-            elif (text == 'idea'):
+            elif ('idea' in text):
                 idea(post_params, text)
 
             elif (text in ['red pill', 'redpill', 'red_pill']):
@@ -1628,6 +1829,21 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
 
             elif (text == 'graph'):
                 create_graph(ulist, request_params, post_params)
+                
+            elif (text.startswith('add group') or text.startswith('addgroup') or text.startswith('make group') or text.startswith('makegroup')):
+                groups.createGroup(form, post_params)
+            
+            elif (text.startswith('add to group') or text.startswith('add to')):
+                groups.addToGroup(form, post_params)
+                
+            elif (text.startswith('people')):
+                groups.peopleInGroup(form, ulist, post_params)
+                
+            elif (text == 'groups'):
+                groups.findGroups(post_params)
+                
+            elif (text.startswith('remove') or text.startswith('delete')):
+                groups.remove(form, post_params)
 
             else:
                 attributes = form.contains(form.sender.properties)
@@ -1637,9 +1853,9 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
                     helper_main(post_params)
 
 
-def run(request_params, post_params, timerlist, group_id, userlist, red, word_dict, testmode):
+def run(request_params, post_params, timerlist, group_id, userlist, red, word_dict, groups, testmode):
     while (1 == True):
-        read_messages(request_params, group_id, userlist, post_params, timerlist, red, word_dict, testmode)
+        read_messages(request_params, group_id, userlist, post_params, timerlist, red, word_dict, groups, testmode)
 
         timerlist.check(post_params)
 
@@ -1657,6 +1873,7 @@ def startup(testmode = False, shouldrun = True):
         bot = auth['test']
     group_id = bot['group_id']
     word_dict = Recorder(group_id, userlist)
+    groups = Groups(testmode)
     request_params = {'token':auth['token']}
     post_params = {'text':'','bot_id':bot['bot_id'],'attachments':[]}
     timerlist = TimerList()
@@ -1668,8 +1885,8 @@ def startup(testmode = False, shouldrun = True):
         text += user.nickname +': ' + str(user.realness) + '\n'
     print(text)
     if shouldrun:
-        run(request_params, post_params, timerlist, group_id, userlist, red, word_dict, testmode)
+        run(request_params, post_params, timerlist, group_id, userlist, red, word_dict, groups, testmode)
 
 
 if __name__ == "__main__":
-    startup(True)
+    startup()
