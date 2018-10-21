@@ -1165,8 +1165,8 @@ def read_messages(request_params, group_id, ulist, post_params, timerlist, red, 
             if mess.sender_type == 'bot' or mess.sender_type == 'system':
                 continue
             else:
-                #thread.start_new_thread(parse_message, (request_params, group_id, ulist, post_params, timerlist, red, word_dict, groups, testmode, mess))
-                parse_message(request_params, group_id, ulist, post_params, timerlist, red, word_dict, groups, testmode, mess)
+                thread.start_new_thread(parse_message, (request_params, group_id, ulist, post_params, timerlist, red, word_dict, groups, testmode, mess))
+                #parse_message(request_params, group_id, ulist, post_params, timerlist, red, word_dict, groups, testmode, mess)
     except Exception:
         print(traceback.format_exc())
         post_params['text'] = "Sorry, something went wrong. Try again, it could just have been a read failure."
@@ -1889,4 +1889,4 @@ def startup(testmode = False, shouldrun = True):
 
 
 if __name__ == "__main__":
-    startup()
+    startup(True)
