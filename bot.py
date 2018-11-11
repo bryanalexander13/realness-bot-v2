@@ -1889,4 +1889,4 @@ def startup(testmode = False, shouldrun = True):
 
 
 if __name__ == "__main__":
-    startup(True)
+    startup()
