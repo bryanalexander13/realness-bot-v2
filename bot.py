@@ -108,7 +108,7 @@ class User:
         person.subtract_realness(multiplier=10*power)
 
     def daily_reward(self, post_params):
-        if self.reward <= datetime.now() - timedelta(days=1):
+        if self.reward.date() < datetime.now().date():
             ran = random.randint(0,10000)
             if ran > 36:
                 rew = max(min(round((random.gauss(2,1))), 5), 1)
@@ -128,7 +128,8 @@ class User:
                 send_message(post_params)
             self.reward = datetime.now()
         else:
-            timeleft = str((self.reward + timedelta(days=1)) - datetime.now()).split('.')[0].split(':')
+            #timeleft = str((self.reward + timedelta(days=1)) - datetime.now()).split('.')[0].split(':')
+            timeleft = str(datetime.combine((datetime.now() + timedelta(days=1)).date(),datetime.min.time()) - datetime.now()).split('.')[0].split(':')
             post_params['text'] = "Sorry, you already gotten your reward for today. " + timeleft[0] + "h " + timeleft[1] + "m " + timeleft[2] + "s left."
             send_message(post_params)
 
