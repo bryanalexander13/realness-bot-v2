@@ -17,7 +17,7 @@ import re
 
 class User:
     """Users information"""
-    def __init__(self, user_id, name, nickname, realness = 0, abilities = [], protected = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"), thornmail = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"), reward = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S.%f"), permission = 'user', last = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S.%f")):
+    def __init__(self, user_id, name, nickname, realness = 0, abilities = [], protected = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"), thornmail = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f"), permission = 'user', last = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S.%f"), ban = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d %H:%M:%S.%f")):
         self.user_id = user_id
         self.name = name
         self.nickname = nickname
@@ -26,8 +26,8 @@ class User:
         self.permission = permission
         self.protected = self.datetime_read(protected)
         self.thornmail = self.datetime_read(thornmail)
+        self.ban = self.datetime_read(ban)
         self.last = self.datetime_read(last)
-        self.reward = self.datetime_read(reward)
         self.switch = {"protect" : "self.protect(ability.val)",
                        "thornmail" : "self.thornmailed(ability.val)",
                        "bomb" : "self.bomb(person, ability.val)"}
@@ -42,7 +42,6 @@ class User:
                 "abilities": self.ability_write(),
                 "protected": self.datetime_write(self.protected),
                 "thornmail": self.datetime_write(self.thornmail),
-                "reward": self.datetime_write(self.reward),
                 "permission": self.permission,
                 "last": self.datetime_write(self.last)}
 
@@ -62,6 +61,9 @@ class User:
     def changeNickname(self, nickname):
         self.nickname = nickname
 
+    def ban_user(self, length):
+        self.ban = datetime.now() + timedelta(hours= length)
+    
     def use_ability(self, form, post_params):
         form.removeCommand('use')
         abilities = form.contains(self.switch.keys())
@@ -107,31 +109,22 @@ class User:
     def bomb(self, person, power):
         person.subtract_realness(multiplier=10*power)
 
-    def daily_reward(self, post_params):
-        if self.reward.date() < datetime.now().date():
-            ran = random.randint(0,10000)
-            if ran > 36:
-                rew = max(min(round((random.gauss(2,1))), 5), 1)
-                self.add_realness(rew)
-                post_params['text'] = "You got " + str(rew) + "rp"
-                send_message(post_params)
-            else:
-                ran = random.randint(0,2)
-                if ran == 0:
-                    ab = Ability('protect', max(min(round((random.gauss(3,1))), 3), 1))
-                elif ran == 1:
-                    ab = Ability('thornmail', max(min(round((random.gauss(3,1))), 3), 1))
-                elif ran == 2:
-                    ab = Ability('bomb', max(min(round((random.gauss(3,1))), 3), 1))
-                self.add_ability(ab)
-                post_params['text'] = "You got a " + ab.type + " " + str(ab.val)
-                send_message(post_params)
-            self.reward = datetime.now()
+    def daily_reward(self):
+        ran = random.randint(0,10000)
+        if ran > 100:
+            rew = max(min(round((random.gauss(2,1))), 5), 1)
+            self.add_realness(rew)
+            return ReturnObject(True, {"name": self.nickname, "val": str(rew) + "rp"})
         else:
-            #timeleft = str((self.reward + timedelta(days=1)) - datetime.now()).split('.')[0].split(':')
-            timeleft = str(datetime.combine((datetime.now() + timedelta(days=1)).date(),datetime.min.time()) - datetime.now()).split('.')[0].split(':')
-            post_params['text'] = "Sorry, you already gotten your reward for today. " + timeleft[0] + "h " + timeleft[1] + "m " + timeleft[2] + "s left."
-            send_message(post_params)
+            ran = random.randint(0,2)
+            if ran == 0:
+                ab = Ability('protect', max(min(round((random.gauss(3,1))), 3), 1))
+            elif ran == 1:
+                ab = Ability('thornmail', max(min(round((random.gauss(3,1))), 3), 1))
+            elif ran == 2:
+                ab = Ability('bomb', max(min(round((random.gauss(3,1))), 3), 1))
+            self.add_ability(ab)
+            return ReturnObject(True, {"name": self.nickname, "val": ab.type + " " + str(ab.val)})
 
     def datetime_write(self, date):
         return date.strftime("%Y-%m-%d %H:%M:%S.%f")
@@ -182,10 +175,10 @@ class Ability:
 class UserList:
     def __init__(self, udict):
         try:
-            self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected'], i['thornmail'], i['reward'], i['permission'], i['last']) for i in udict]
+            self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected'], i['thornmail'], i['permission'], i['last'], i['ban']) for i in udict]
         except:
             try:
-                self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected'], i['thornmail'], i['reward'], i['permission']) for i in udict]
+                self.ulist = [User(i['user_id'], i["name"], i['nickname'], i['realness'], i['abilities'], i['protected'], i['thornmail'], i['permission'], i['last']) for i in udict]
             except:
                 self.ulist = [User(i['user_id'], i["name"], i['nickname']) for i in udict]
         self.ids = {i.user_id:i for i in self.ulist}
@@ -369,8 +362,13 @@ class TimerList:
                                    "Ex. @rb timer @Employed Degenerate 10 or\n" +
                                    "@rb timer 10")
             send_message(post_params)
+            return
 
         if len(form.numbers) == 1:
+            if (form.numbers[0] < 5):
+                post_params['text'] = "Timers can only be set for at least 5 minutes"
+                send_message(post_params)
+                return
             post_params['text'] = ''
             if len(form.people) > 0:
                 post_params['text'] += "Timer set for " + str(form.numbers[0]) + " minutes for:"
@@ -1034,6 +1032,20 @@ def read_auth():
         file = auth.readlines()
         data = json.loads(file[0])
         return data
+    
+def general_data_load():
+    with open(os.path.abspath('general_data.json'),'r') as gen:
+        file = gen.readlines()
+        data = json.loads(file[0])
+        return data
+    
+def general_data_write(genral_data):
+    """Writes last message id to last.json.
+    :param str last_message: last message id"""
+    with open(os.path.abspath('general_data.json'),'w') as gen:
+        gen.write(json.dumps(genral_data))
+        gen.close()
+    
 
 def users_load():
     """Loads users from users2.json.
@@ -1391,10 +1403,7 @@ def add_realness(change_dict, form, post_params):
     else:
         return ReturnObject(False)
 
-def very_real(form, post_params):
-    person = form.ulist.find(form.message.sender_id)
-    if person.last > (datetime.now() - timedelta(minutes=30)):
-        post_params['text'] = "Sorry, you can only use this once every 30 minutes"
+def very_real(person, form, post_params):
     parser = Parser(form)
     result = parser.whoToChange()
     if (not result.success):
@@ -1408,12 +1417,8 @@ def very_real(form, post_params):
         person.last = datetime.now()
 
 
-def not_real(form, post_params):
-    person = form.ulist.find(form.message.sender_id)
-    if person.last > (datetime.now() - timedelta(minutes=30)):
-        post_params['text'] = "Sorry, you can only use this once every 30 minutes"
-        send_message(post_params)
-        return
+def not_real(person, form, post_params):
+    
     parser = Parser(form)
     result = parser.whoToChange()
     if (not result.success):
@@ -1426,6 +1431,53 @@ def not_real(form, post_params):
             send_message(post_params)
         person.last = datetime.now()
 
+def change_realness(reason, form, post_params):
+    person = form.ulist.find(form.message.sender_id)
+    if person.ban > datetime.now():
+        post_params['text'] = "Sorry, you are banned for " + str(person.ban - datetime.now()) + " hours"
+        send_message(post_params)
+        return
+    if person.last > (datetime.now() - timedelta(minutes=30)):
+        post_params['text'] = "Sorry, you can only use this once every 30 minutes. You have " + str((person.last + timedelta(minutes=30)) - datetime.now()) + " minutes left"
+        send_message(post_params)
+        return
+    if reason == 'not':
+        not_real(person, form, post_params)
+    else:
+        very_real(person, form, post_params)
+        
+def ban(form, post_params):
+    if (form.sender.permission != 'admin'):
+        post_params['text'] = 'Sorry, only admins can use that ability'
+        send_message(post_params)
+        return
+    if (len(form.people) < 1):
+        post_params['text'] = 'Please give a person'
+        send_message(post_params)
+        return
+    if (len(form.people) > 1):
+        post_params['text'] = 'Sorry, only one person at a time'
+        send_message(post_params)
+        return
+    if (len(form.numbers) < 1):
+        post_params['text'] = 'Please give a time duration'
+        send_message(post_params)
+        return
+    if (len(form.numbers) > 1):
+        post_params['text'] = 'Please give only one number'
+        send_message(post_params)
+        return
+    form.removeCommand('ban')
+    nonsense = form.findNonsense([])
+    if nonsense.success:
+        post_params['text'] = "I don't understand " + nonsense.obj
+        send_message(post_params)
+        return
+    form.people[0].ban_user(form.numbers[0])
+    post_params['text'] = form.people[0].nickname + ' is banned for ' + str(form.numbers[0]) + ' hours'
+    send_message(post_params)
+        
+        
 def clear(form, post_params):
     result = form.ulist.clearRealness(form.sender.user_id)
     if (not result.success):
@@ -1735,6 +1787,24 @@ def play_game(form, post_params):
         mode = 'phone'
 
     play(form.ulist, player1, player1_name, player2, player2_name, mode)
+    
+def daily_reward(ulist, post_params):
+    text = ''
+    gen = general_data_load()
+    reward = datetime.strptime(gen['reward'], "%Y-%m-%d %H:%M:%S.%f")
+    if (reward.date() >= datetime.now().date()):
+        timeleft = str(datetime.combine((datetime.now() + timedelta(days=1)).date(),datetime.min.time()) - datetime.now()).split('.')[0].split(':')
+        text = 'Time until next reward: ' + timeleft[0] + 'h ' + timeleft[1] + 'm ' + timeleft[2] + 's\n'
+    else:
+        for person in ulist.ulist:
+            reward = person.daily_reward()
+            text += reward.obj['name'] + ": " + reward.obj['val'] + "\n"
+        gen['reward'] = datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")
+        general_data_write(gen)
+        
+    post_params['text'] = text
+    send_message(post_params)
+    
 
 #checks for last message and runs commands
 def commands(message, ulist, post_params, timerlist, request_params, group_id, red, groups):
@@ -1766,11 +1836,11 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
             #do not completely remove people references in text for these
             #Position of the references are important
             if text.startswith('very real'):
-                very_real(form, post_params)
+                change_realness('very', form, post_params)
                 return
 
             elif text.startswith('not real'):
-                not_real(form, post_params)
+                change_realness('not', form, post_params)
                 return
 
             #remove mentions first, allows for less f-ups
@@ -1787,7 +1857,7 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
                 helper_specific(post_params, text)
 
             elif (text.startswith('reward') and len(form.people) == 0):
-                form.sender.daily_reward(post_params)
+                daily_reward(ulist, post_params)
 
             elif (text.startswith('here')):
                 timerlist.cancel_timer(message.user_id, post_params)
@@ -1824,6 +1894,9 @@ def commands(message, ulist, post_params, timerlist, request_params, group_id, r
 
             elif (text == 'clear'):
                 clear(form, post_params)
+                
+            elif (text.startswith('ban')):
+                ban(form, post_params)
 
             elif (text.startswith('play')):
                 play_game(form, post_params)
